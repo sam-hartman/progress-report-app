@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Maryland Public School Quarterly Progress Report Generator - Upload student work, perform OCR, generate reports">
+    <meta name="theme-color" content="#0066cc">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>QPR Notes - Maryland Progress Reports</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>QPR Notes</h1>
+            <p class="subtitle">Maryland Public School Progress Reports</p>
+        </header>
+
+        <!-- Step Indicator -->
+        <div class="steps">
+            <div class="step active" data-step="upload">
+                <span class="step-number">1</span>
+                <span class="step-label">Upload</span>
+            </div>
+            <div class="step" data-step="ocr">
+                <span class="step-number">2</span>
+                <span class="step-label">OCR</span>
+            </div>
+            <div class="step" data-step="summary">
+                <span class="step-number">3</span>
+                <span class="step-label">Report</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Upload Step -->
+            <section id="upload-step" class="step-content active">
+                <h2>Upload Student Work</h2>
+                <p class="description">Take a photo or upload an image of student work</p>
+                
+                <div class="upload-area" id="upload-area">
+                    <input type="file" id="file-input" accept="image/*" capture="environment" style="display: none;">
+                    <div class="upload-instructions">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <p>Tap to upload or take photo</p>
+                    </div>
+                </div>
+                
+                <button class="btn btn-secondary" id="camera-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Use Camera
+                </button>
+                
+                <div id="image-preview" class="image-preview" style="display: none;">
+                    <img id="preview-img" alt="Preview">
+                    <button class="btn-icon remove-btn" id="remove-img" title="Remove">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <button class="btn btn-primary btn-full" id="continue-to-ocr" disabled>Continue</button>
+            </section>
+
+            <!-- OCR Step -->
+            <section id="ocr-step" class="step-content" style="display: none;">
+                <h2>Process OCR</h2>
+                <p class="description">Extract text from the image</p>
+                
+                <div class="card">
+                    <h3>OCR Options</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="use-mistral" checked> 
+                            <span>Use Mistral AI (more accurate, requires API key)</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="mistral-key">Mistral API Key:</label>
+                        <input type="password" id="mistral-key" placeholder="sk-..." value="">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enhance-image" checked> 
+                            <span>Enhance image quality</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary btn-full" id="process-ocr">
+                    <span class="btn-text">Process OCR</span>
+                    <span class="spinner" style="display: none;"></span>
+                </button>
+                
+                <div class="progress-bar" id="ocr-progress" style="display: none;">
+                    <div class="progress-fill" id="ocr-progress-fill"></div>
+                </div>
+                
+                <div id="ocr-results" class="card" style="display: none;">
+                    <h3>Extracted Text</h3>
+                    <div class="text-preview" id="ocr-text"></div>
+                    <button class="btn btn-small copy-btn" id="copy-ocr">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="back-to-upload">Back</button>
+                    <button class="btn btn-primary" id="continue-to-summary" disabled>Continue</button>
+                </div>
+            </section>
+
+            <!-- Summary Step -->
+            <section id="summary-step" class="step-content" style="display: none;">
+                <h2>Generate Report</h2>
+                <p class="description">Create a Maryland progress report</p>
+                
+                <div class="card">
+                    <h3>Student Information</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="student-name">Student Name</label>
+                            <input type="text" id="student-name" placeholder="John Doe">
+                        </div>
+                        <div class="form-group">
+                            <label for="grade-level">Grade Level</label>
+                            <select id="grade-level">
+                                <option value="">Select...</option>
+                                <option value="Pre-K">Pre-K</option>
+                                <option value="Kindergarten">Kindergarten</option>
+                                <option value="1">1st Grade</option>
+                                <option value="2">2nd Grade</option>
+                                <option value="3">3rd Grade</option>
+                                <option value="4">4th Grade</option>
+                                <option value="5">5th Grade</option>
+                                <option value="6">6th Grade</option>
+                                <option value="7">7th Grade</option>
+                                <option value="8">8th Grade</option>
+                                <option value="9">9th Grade</option>
+                                <option value="10">10th Grade</option>
+                                <option value="11">11th Grade</option>
+                                <option value="12">12th Grade</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <select id="subject">
+                                <option value="">Select...</option>
+                                <option value="Reading/Literacy">Reading/Literacy</option>
+                                <option value="Mathematics">Mathematics</option>
+                                <option value="Science">Science</option>
+                                <option value="Social Studies">Social Studies</option>
+                                <option value="Writing">Writing</option>
+                                <option value="All Subjects">All Subjects</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="teacher-name">Teacher Name</label>
+                            <input type="text" id="teacher-name" placeholder="Ms. Smith">
+                        </div>
+                        <div class="form-group">
+                            <label for="school">School</label>
+                            <input type="text" id="school" placeholder="Maryland Elementary">
+                        </div>
+                        <div class="form-group">
+                            <label for="reporting-period">Reporting Period</label>
+                            <select id="reporting-period">
+                                <option value="">Select...</option>
+                                <option value="Q1 - First Quarter">Q1 - First Quarter</option>
+                                <option value="Q2 - Second Quarter">Q2 - Second Quarter</option>
+                                <option value="Q3 - Third Quarter">Q3 - Third Quarter</option>
+                                <option value="Q4 - Fourth Quarter">Q4 - Fourth Quarter</option>
+                                <option value="Mid-Year">Mid-Year</option>
+                                <option value="End of Year">End of Year</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="checkbox-group">
+                        <label>
+                            <input type="checkbox" id="include-standards" checked> 
+                            <span>Include Maryland Standards</span>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="include-behavioral" checked> 
+                            <span>Include Behavioral Notes</span>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="include-iep"> 
+                            <span>Include IEP Goals</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary btn-full" id="generate-summary">
+                    <span class="btn-text">Generate Progress Report</span>
+                    <span class="spinner" style="display: none;"></span>
+                </button>
+                
+                <div class="progress-bar" id="summary-progress" style="display: none;">
+                    <div class="progress-fill" id="summary-progress-fill"></div>
+                </div>
+                
+                <div id="summary-results" class="card" style="display: none;">
+                    <h3>Progress Report</h3>
+                    <div class="report-output" id="summary-text"></div>
+                    <div class="btn-group">
+                        <button class="btn btn-small copy-btn" id="copy-summary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            Copy
+                        </button>
+                        <button class="btn btn-small" id="download-summary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn btn-secondary" id="back-to-ocr">Back</button>
+                    <button class="btn btn-primary" id="start-over">Start Over</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast" style="display: none;">
+            <span class="toast-message"></span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

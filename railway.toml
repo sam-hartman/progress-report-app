@@ -1,0 +1,26 @@
+[build]
+# Backend service
+[[services]]
+  name = "qpr-backend"
+  type = "python"
+  buildCommand = "pip install -r backend/requirements.txt"
+  startCommand = "uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+  workingDirectory = "."
+  
+  [services.env]
+  MISTRAL_API_KEY = "${MISTRAL_API_KEY}"
+  DEBUG = "false"
+  PORT = "8000"
+  CORS_ORIGINS = "https://qpr-frontend.vercel.app,http://localhost:3000"
+  
+# Frontend service
+[[services]]
+  name = "qpr-frontend"
+  type = "node"
+  buildCommand = "cd frontend && npm install && npm run build"
+  startCommand = "npx serve -s frontend/dist -l 3000"
+  workingDirectory = "."
+  staticPublishPath = "frontend/dist"
+  
+  [services.env]
+  VITE_API_URL = "https://qpr-backend.up.railway.app/api"

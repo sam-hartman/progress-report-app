@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: qpr-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: MISTRAL_API_KEY
+        value: ${MISTRAL_API_KEY}
+      - key: DEBUG
+        value: "false"
+      - key: PORT
+        value: "8000"
+      - key: CORS_ORIGINS
+        value: "https://qpr-frontend.onrender.com,http://localhost:3000"
+    autoDeploy: true
+
+  - type: web
+    name: qpr-frontend
+    runtime: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: npx serve -s frontend/dist -l 3000
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: "https://qpr-backend.onrender.com/api"
+    autoDeploy: true

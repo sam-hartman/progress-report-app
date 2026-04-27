@@ -223,12 +223,13 @@ function ReportPage() {
 
     try {
       // Step 1: OCR each image
-      setGenerationStatus(`Reading text from ${images.length} image${images.length > 1 ? 's' : ''}...`);
+      const totalSteps = images.length + 1;
       const ocrTexts: string[] = [];
       const ocrPreviews: { filename: string; text: string }[] = [];
 
-      for (const image of images) {
-        setGenerationStatus(`Reading ${image.filename}...`);
+      for (let idx = 0; idx < images.length; idx++) {
+        const image = images[idx];
+        setGenerationStatus(`Step ${idx + 1}/${totalSteps}: Extracting text from ${image.filename}`);
         const result = await API.ocr.process({
           image_id: image.image_id,
           language: 'eng',
@@ -244,7 +245,7 @@ function ReportPage() {
       const combinedText = ocrTexts.join('\n\n---\n\n');
 
       // Step 2: Generate summary from combined OCR text
-      setGenerationStatus('Generating progress report...');
+      setGenerationStatus(`Step ${totalSteps}/${totalSteps}: Writing progress report...`);
       const result = await API.summary.generate({
         text: combinedText,
         template: 'maryland_qpr',

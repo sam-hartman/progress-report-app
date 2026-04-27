@@ -219,10 +219,12 @@ Text to analyze:
         self,
         text: str,
         template: str = "maryland_qpr",
+        report_type: str = "general_ed",
         grade_level: Optional[str] = None,
         subject: Optional[str] = None,
         student_name: Optional[str] = None,
         teacher_name: Optional[str] = None,
+        case_manager: Optional[str] = None,
         school: Optional[str] = None,
         reporting_period: Optional[str] = None,
         include_standards: bool = True,
@@ -239,23 +241,35 @@ Text to analyze:
 
         # Track PII for log sanitization
         self._pii_fields = [
-            v for v in [student_name, teacher_name, school] if v
+            v for v in [student_name, teacher_name, case_manager, school] if v
         ]
 
         # Send real names to the LLM — ZDR protects PII at the API level
-        prompt = self._build_summary_prompt(
-            text=text,
-            template=template,
-            grade_level=grade_level,
-            subject=subject,
-            student_name=student_name,
-            teacher_name=teacher_name,
-            school=school,
-            reporting_period=reporting_period,
-            include_standards=include_standards,
-            include_iep_goals=include_iep_goals,
-            include_behavioral=include_behavioral
-        )
+        if report_type == "iep_progress_monitoring":
+            prompt = self._build_iep_prompt(
+                text=text,
+                grade_level=grade_level,
+                subject=subject,
+                student_name=student_name,
+                case_manager=case_manager,
+                school=school,
+                reporting_period=reporting_period,
+                include_behavioral=include_behavioral,
+            )
+        else:
+            prompt = self._build_summary_prompt(
+                text=text,
+                template=template,
+                grade_level=grade_level,
+                subject=subject,
+                student_name=student_name,
+                teacher_name=teacher_name,
+                school=school,
+                reporting_period=reporting_period,
+                include_standards=include_standards,
+                include_iep_goals=include_iep_goals,
+                include_behavioral=include_behavioral,
+            )
 
         payload = {
             "model": self.llm_model,
@@ -412,6 +426,110 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
         
         return "\n".join(prompt_parts)
     
+    def _build_iep_prompt(
+        self,
+        text: str,
+        grade_level: Optional[str],
+        subject: Optional[str],
+        student_name: Optional[str],
+        case_manager: Optional[str],
+        school: Optional[str],
+        reporting_period: Optional[str],
+        include_behavioral: bool,
+    ) -> str:
+        """Build the IEP Progress Monitoring prompt (Goalbook format)"""
+
+        prompt_parts = [
+            "You are an experienced special education teacher and IEP case manager in Maryland public schools.",
+            "You have deep expertise in writing IEP progress monitoring reports using the Goalbook data collection format.",
+            "",
+            "Analyze the following extracted data from IEP progress monitoring data collection sheets and write a comprehensive IEP quarterly progress report.",
+            "",
+            "Student Information:",
+        ]
+
+        if student_name:
+            prompt_parts.append(f"- Student Name: {student_name}")
+        if grade_level:
+            prompt_parts.append(f"- Grade Level: {grade_level}")
+        if subject:
+            prompt_parts.append(f"- Goal Area: {subject}")
+        if case_manager:
+            prompt_parts.append(f"- Case Manager: {case_manager}")
+        if school:
+            prompt_parts.append(f"- School: {school}")
+        if reporting_period:
+            prompt_parts.append(f"- Reporting Period: {reporting_period}")
+
+        prompt_parts.extend([
+            "",
+            "Extracted Data from IEP Progress Monitoring Sheets:",
+            "---",
+            text,
+            "---",
+            "",
+            "IMPORTANT: The data above comes from Goalbook-style IEP progress monitoring sheets.",
+            "Each sheet typically contains:",
+            "- An Annual Learning Target (the overarching IEP goal)",
+            "- Numbered Objectives (specific measurable benchmarks within the goal)",
+            "- Data collection tables with dates, scores/percentages, strategies used, and notes",
+            "- Determination checkboxes: Met / Partially Met / Not Met for each objective",
+            "",
+            "Generate an IEP Quarterly Progress Monitoring Report with the following structure:",
+            "",
+            "## IEP PROGRESS MONITORING REPORT",
+            "",
+            "Include a header with student name, grade, goal area, case manager, school, and reporting period.",
+            "",
+            "For EACH goal found in the data, create a section with:",
+            "",
+            "### GOAL: [Goal Title from the data]",
+            "",
+            "**Annual Learning Target:** [Copy the annual learning target exactly as written]",
+            "",
+            "Then for each objective under that goal:",
+            "",
+            "**Objective [number]: [objective description]**",
+            "- **Current Data:** [Most recent data point with date, score/percentage]",
+            "- **Trend:** [Improving / Maintaining / Declining — based on data point progression]",
+            "- **Status:** [Met / Partially Met / Not Met — based on criteria in the objective and data]",
+            "- **Evidence:** [Specific data points, scores, or observations from the sheets]",
+            "",
+            "After all objectives for a goal, include:",
+            "",
+            "**Overall Goal Progress:** [Summary of progress toward the annual learning target]",
+            "**Strategies Used:** [List strategies/accommodations noted in the data]",
+            "**Recommendations:** [Next steps, adjustments to instruction, or changes to consider]",
+            "",
+        ])
+
+        if include_behavioral:
+            prompt_parts.extend([
+                "If the data includes a Learning Behavior or Behavioral goal, report on:",
+                "- Task completion rates and trends",
+                "- Number of prompts needed (and trend over time)",
+                "- Specific behavioral observations noted in the data",
+                "- Whether resistance/avoidance has increased or decreased",
+                "",
+            ])
+
+        prompt_parts.extend([
+            "Formatting Requirements:",
+            "- Write in a professional, objective tone appropriate for IEP documentation",
+            "- Use the student's actual name throughout the report",
+            "- Reference specific data points, dates, scores, and percentages from the extracted data",
+            "- For each objective, clearly state Met / Partially Met / Not Met based on the criteria",
+            "- If data is insufficient to make a determination, state 'Insufficient Data' and explain",
+            "- Use markdown formatting with headers (##, ###), bold (**), and bullet points",
+            "- Do NOT use any emojis, emoticons, or Unicode icons anywhere in the report",
+            "- Do NOT fabricate data — only reference information found in the extracted text",
+            "- If multiple goal areas are present in the data, create separate sections for each",
+            "",
+            "Return the report as a well-formatted markdown document.",
+        ])
+
+        return "\n".join(prompt_parts)
+
     def _parse_summary_response(self, text: str) -> StructuredSummary:
         """
         Parse the summary response to extract structured data

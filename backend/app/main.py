@@ -568,10 +568,12 @@ async def generate_summary(
         summary_response = await mistral_client.generate_summary(
             text=request.text,
             template=request.template,
+            report_type=request.report_type,
             grade_level=request.grade_level,
             subject=request.subject,
             student_name=request.student_name,
             teacher_name=request.teacher_name,
+            case_manager=request.case_manager,
             school=request.school,
             reporting_period=request.reporting_period,
             include_standards=request.include_standards,

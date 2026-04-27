@@ -1,10 +1,10 @@
 // Zustand store for application state
 import { create } from 'zustand';
 import { createJSONStorage, devtools, persist } from 'zustand/middleware';
-import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, ReportRecord, PrivacyConsent, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
+import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, ReportRecord, PrivacyConsent, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS, IEP_GOAL_AREAS } from '../types';
 import { encryptedStorage } from '../utils/encryptedStorage';
 
-export { MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS };
+export { MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS, IEP_GOAL_AREAS };
 
 // Data-only portion of AppState (no action methods)
 type AppData = Omit<AppState,
@@ -64,14 +64,16 @@ const initialState: AppData = {
   
   // Form data
   formData: {
+    report_type: 'iep_progress_monitoring' as const,
     student_name: '',
     grade_level: MARYLAND_GRADES[2], // Default to Grade 1
     subject: MARYLAND_SUBJECTS[0], // Default to Reading/Literacy
+    case_manager: '',
     teacher_name: '',
     school: '',
     reporting_period: REPORTING_PERIODS[0], // Default to Q1
     include_standards: true,
-    include_iep_goals: false,
+    include_iep_goals: true,
     include_behavioral: true,
   },
   

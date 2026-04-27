@@ -108,10 +108,12 @@ export interface ExtractTablesRequest {
 export interface GenerateSummaryRequest {
   text: string;
   template?: string;
+  report_type?: ReportType;
   grade_level?: string;
   subject?: string;
   student_name?: string;
   teacher_name?: string;
+  case_manager?: string;
   school?: string;
   reporting_period?: string;
   custom_prompt?: string;
@@ -164,9 +166,11 @@ export interface AppState {
 
   // Form data for summary generation
   formData: {
+    report_type: ReportType;
     student_name: string;
     grade_level: string;
     subject: string;
+    case_manager: string;
     teacher_name: string;
     school: string;
     reporting_period: string;
@@ -268,8 +272,28 @@ export const MARYLAND_SUBJECTS = [
   'Writing',
   'Speaking & Listening',
   'Language',
-  'All Subjects'
+  'All Subjects',
 ];
+
+// IEP Progress Monitoring types
+export type ReportType = 'general_ed' | 'iep_progress_monitoring';
+
+export const IEP_GOAL_AREAS = [
+  'Reading Decoding',
+  'Reading Comprehension',
+  'Written Language',
+  'Math Calculation',
+  'Math Problem Solving',
+  'Learning Behavior',
+  'Speech/Language',
+  'Social/Emotional',
+  'Fine Motor',
+  'Gross Motor',
+  'Adaptive Behavior',
+  'Other',
+] as const;
+
+export type IEPGoalArea = (typeof IEP_GOAL_AREAS)[number];
 
 export const REPORTING_PERIODS = [
   'Q1 - First Quarter',

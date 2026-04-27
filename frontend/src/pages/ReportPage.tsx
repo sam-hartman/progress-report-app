@@ -70,6 +70,7 @@ import {
   MARYLAND_GRADES,
   MARYLAND_SUBJECTS,
   REPORTING_PERIODS,
+  IEP_GOAL_AREAS,
 } from '../types';
 import PrivacyConsentModal from '../components/PrivacyConsentModal';
 import PrivacyBanner from '../components/PrivacyBanner';
@@ -273,14 +274,20 @@ function ReportPage() {
       setOcrPreviewTexts(ocrPreviews);
       const combinedText = ocrTexts.join('\n\n---\n\n');
 
-      setGenerationStatus(`Step ${totalSteps} of ${totalSteps}: Writing your progress report`);
+      setGenerationStatus(
+        formData.report_type === 'iep_progress_monitoring'
+          ? `Step ${totalSteps} of ${totalSteps}: Writing your IEP progress monitoring report`
+          : `Step ${totalSteps} of ${totalSteps}: Writing your progress report`
+      );
       const result = await API.summary.generate({
         text: combinedText,
         template: 'maryland_qpr',
+        report_type: formData.report_type,
         grade_level: formData.grade_level,
         subject: formData.subject,
         student_name: formData.student_name || undefined,
         teacher_name: formData.teacher_name || undefined,
+        case_manager: formData.case_manager || undefined,
         school: formData.school || undefined,
         reporting_period: formData.reporting_period,
         include_standards: formData.include_standards,
@@ -374,11 +381,11 @@ function ReportPage() {
           <Card variant="outline" bg="brand.50" borderColor="brand.200">
             <CardBody py={4}>
               <Text fontSize="md" fontWeight={700} color="brand.800" mb={2}>
-                Welcome! This tool helps you create quarterly progress reports.
+                Welcome! This tool helps you create progress reports and IEP progress monitoring reports.
               </Text>
               <Text fontSize="sm" color="gray.700" lineHeight={1.7} mb={3}>
-                Upload a photo or scan of student work, fill in a few details, and this tool will
-                read the student's work and write a complete Maryland-format progress report for you.
+                Upload photos of student work or Goalbook IEP data collection sheets, fill in a few details,
+                and this tool will read the data and write a complete report for you.
                 You can then download it as a Word document, print it, or copy and paste it.
               </Text>
               <Flex
@@ -414,7 +421,9 @@ function ReportPage() {
               Step 1: Upload Student Work
             </Text>
             <Text fontSize="xs" color="gray.500" mb={3}>
-              Take a photo or upload an image of a worksheet, test, quiz, or writing sample. You can add multiple images for the same student.
+              {formData.report_type === 'iep_progress_monitoring'
+                ? 'Upload photos of Goalbook IEP data collection sheets. You can add multiple pages for the same student.'
+                : 'Take a photo or upload an image of a worksheet, test, quiz, or writing sample. You can add multiple images for the same student.'}
             </Text>
 
             <Box
@@ -506,10 +515,47 @@ function ReportPage() {
         <Card variant="outline">
           <CardBody>
             <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={1}>
-              Step 2: Student Information
+              Step 2: Report Type & Student Information
             </Text>
+
+            {/* Report Type Toggle */}
+            <HStack spacing={2} mb={3}>
+              <Button
+                size="sm"
+                variant={formData.report_type === 'iep_progress_monitoring' ? 'solid' : 'outline'}
+                bg={formData.report_type === 'iep_progress_monitoring' ? 'brand.700' : undefined}
+                color={formData.report_type === 'iep_progress_monitoring' ? 'white' : 'gray.600'}
+                _hover={formData.report_type === 'iep_progress_monitoring' ? { bg: 'brand.800' } : { bg: 'gray.100' }}
+                onClick={() => updateFormData({
+                  report_type: 'iep_progress_monitoring',
+                  include_iep_goals: true,
+                  subject: IEP_GOAL_AREAS[0],
+                })}
+                fontWeight={600}
+              >
+                IEP Progress Monitoring
+              </Button>
+              <Button
+                size="sm"
+                variant={formData.report_type === 'general_ed' ? 'solid' : 'outline'}
+                bg={formData.report_type === 'general_ed' ? 'brand.700' : undefined}
+                color={formData.report_type === 'general_ed' ? 'white' : 'gray.600'}
+                _hover={formData.report_type === 'general_ed' ? { bg: 'brand.800' } : { bg: 'gray.100' }}
+                onClick={() => updateFormData({
+                  report_type: 'general_ed',
+                  include_iep_goals: false,
+                  subject: MARYLAND_SUBJECTS[0],
+                })}
+                fontWeight={600}
+              >
+                General Education
+              </Button>
+            </HStack>
+
             <Text fontSize="xs" color="gray.500" mb={3}>
-              Fill in what you know. Only the grade and subject are required -- the rest is optional but will make the report more specific.
+              {formData.report_type === 'iep_progress_monitoring'
+                ? 'Upload photos of Goalbook data collection sheets. Fill in the student and case manager info below.'
+                : 'Fill in what you know. Only the grade and subject are required -- the rest is optional but will make the report more specific.'}
             </Text>
 
             <Stack spacing={3} direction={{ base: 'column', md: 'row' }}>
@@ -533,9 +579,13 @@ function ReportPage() {
                 </Select>
               </FormControl>
               <FormControl isRequired>
-                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Subject</FormLabel>
+                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>
+                  {formData.report_type === 'iep_progress_monitoring' ? 'Goal Area' : 'Subject'}
+                </FormLabel>
                 <Select size="sm" borderColor="gray.300" value={formData.subject} onChange={(e) => updateFormData({ subject: e.target.value })}>
-                  {MARYLAND_SUBJECTS.map((s: string) => <option key={s} value={s}>{s}</option>)}
+                  {formData.report_type === 'iep_progress_monitoring'
+                    ? IEP_GOAL_AREAS.map((g) => <option key={g} value={g}>{g}</option>)
+                    : MARYLAND_SUBJECTS.map((s: string) => <option key={s} value={s}>{s}</option>)}
                 </Select>
               </FormControl>
             </Stack>
@@ -543,19 +593,35 @@ function ReportPage() {
             <Divider my={3} borderColor="gray.200" />
 
             <Stack spacing={3} direction={{ base: 'column', md: 'row' }}>
-              <FormControl>
-                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Teacher Name</FormLabel>
-                <Input
-                  size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
-                  value={formData.teacher_name}
-                  onChange={(e) => updateFormData({ teacher_name: e.target.value })}
-                  placeholder="e.g. Ms. Rivera"
-                  autoComplete="one-time-code"
-                  name="teacher_name_nofill"
-                  data-lpignore="true"
-                  data-form-type="other"
-                />
-              </FormControl>
+              {formData.report_type === 'iep_progress_monitoring' ? (
+                <FormControl>
+                  <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Case Manager</FormLabel>
+                  <Input
+                    size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
+                    value={formData.case_manager}
+                    onChange={(e) => updateFormData({ case_manager: e.target.value })}
+                    placeholder="e.g. Ms. Johnson"
+                    autoComplete="one-time-code"
+                    name="case_manager_nofill"
+                    data-lpignore="true"
+                    data-form-type="other"
+                  />
+                </FormControl>
+              ) : (
+                <FormControl>
+                  <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Teacher Name</FormLabel>
+                  <Input
+                    size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
+                    value={formData.teacher_name}
+                    onChange={(e) => updateFormData({ teacher_name: e.target.value })}
+                    placeholder="e.g. Ms. Rivera"
+                    autoComplete="one-time-code"
+                    name="teacher_name_nofill"
+                    data-lpignore="true"
+                    data-form-type="other"
+                  />
+                </FormControl>
+              )}
               <FormControl>
                 <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>School</FormLabel>
                 <Input
@@ -583,12 +649,16 @@ function ReportPage() {
               Check the boxes below to include additional sections in the report:
             </Text>
             <HStack spacing={5}>
-              <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_standards} onChange={(e) => updateFormData({ include_standards: e.target.checked })}>
-                <Text fontSize="xs" color="gray.600">Maryland Standards</Text>
-              </Checkbox>
-              <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_iep_goals} onChange={(e) => updateFormData({ include_iep_goals: e.target.checked })}>
-                <Text fontSize="xs" color="gray.600">IEP Goals</Text>
-              </Checkbox>
+              {formData.report_type === 'general_ed' && (
+                <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_standards} onChange={(e) => updateFormData({ include_standards: e.target.checked })}>
+                  <Text fontSize="xs" color="gray.600">Maryland Standards</Text>
+                </Checkbox>
+              )}
+              {formData.report_type === 'general_ed' && (
+                <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_iep_goals} onChange={(e) => updateFormData({ include_iep_goals: e.target.checked })}>
+                  <Text fontSize="xs" color="gray.600">IEP Goals</Text>
+                </Checkbox>
+              )}
               <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_behavioral} onChange={(e) => updateFormData({ include_behavioral: e.target.checked })}>
                 <Text fontSize="xs" color="gray.600">Behavioral Notes</Text>
               </Checkbox>
@@ -612,7 +682,11 @@ function ReportPage() {
             fontWeight={600}
             letterSpacing="0.01em"
           >
-            {images.length === 0 ? 'Upload an Image First' : 'Generate Progress Report'}
+            {images.length === 0
+              ? 'Upload an Image First'
+              : formData.report_type === 'iep_progress_monitoring'
+                ? 'Generate IEP Progress Report'
+                : 'Generate Progress Report'}
           </Button>
           {images.length === 0 && !summaryText && (
             <Text fontSize="xs" color="gray.400" textAlign="center" mt={2}>
@@ -778,11 +852,22 @@ function ReportPage() {
                   </Text>
                 </Flex>
                 <SimpleGrid columns={{ base: 2, md: 3 }} spacing={2} fontSize="xs" color="gray.600">
+                  {viewingReport.formData.report_type === 'iep_progress_monitoring' && (
+                    <Text><Text as="span" fontWeight={600}>Type:</Text> IEP Progress Monitoring</Text>
+                  )}
                   {viewingReport.formData.student_name && (
                     <Text><Text as="span" fontWeight={600}>Student:</Text> {viewingReport.formData.student_name}</Text>
                   )}
                   <Text><Text as="span" fontWeight={600}>Grade:</Text> {viewingReport.formData.grade_level}</Text>
-                  <Text><Text as="span" fontWeight={600}>Subject:</Text> {viewingReport.formData.subject}</Text>
+                  <Text>
+                    <Text as="span" fontWeight={600}>
+                      {viewingReport.formData.report_type === 'iep_progress_monitoring' ? 'Goal Area:' : 'Subject:'}
+                    </Text>{' '}
+                    {viewingReport.formData.subject}
+                  </Text>
+                  {viewingReport.formData.case_manager && (
+                    <Text><Text as="span" fontWeight={600}>Case Manager:</Text> {viewingReport.formData.case_manager}</Text>
+                  )}
                   {viewingReport.formData.teacher_name && (
                     <Text><Text as="span" fontWeight={600}>Teacher:</Text> {viewingReport.formData.teacher_name}</Text>
                   )}
@@ -919,6 +1004,7 @@ function ReportPage() {
                           {report.formData.student_name || 'Unnamed Student'}
                           <Text as="span" fontWeight={400} color="gray.500">
                             {' -- '}{report.formData.subject}, Grade {report.formData.grade_level}
+                            {report.formData.report_type === 'iep_progress_monitoring' && ' (IEP)'}
                           </Text>
                         </Text>
                         <Text fontSize="xs" color="gray.400">

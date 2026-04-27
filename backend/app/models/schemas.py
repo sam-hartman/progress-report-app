@@ -47,14 +47,16 @@ class GenerateSummaryRequest(BaseModel):
     """Request schema for summary generation"""
     text: str
     template: str = "maryland_qpr"
+    report_type: str = "general_ed"  # "general_ed" or "iep_progress_monitoring"
     grade_level: Optional[str] = None
     subject: Optional[str] = None
     student_name: Optional[str] = None
     teacher_name: Optional[str] = None
+    case_manager: Optional[str] = None
     school: Optional[str] = None
     reporting_period: Optional[str] = None
     custom_prompt: Optional[str] = None
-    
+
     # Maryland-specific options
     include_standards: bool = True
     include_iep_goals: bool = False

@@ -368,6 +368,7 @@ function ReportPage() {
                   value={formData.student_name}
                   onChange={(e) => updateFormData({ student_name: e.target.value })}
                   placeholder="Name"
+                  autoComplete="off"
                 />
               </FormControl>
               <FormControl>
@@ -394,6 +395,7 @@ function ReportPage() {
                   value={formData.teacher_name}
                   onChange={(e) => updateFormData({ teacher_name: e.target.value })}
                   placeholder="Name"
+                  autoComplete="off"
                 />
               </FormControl>
               <FormControl>
@@ -403,6 +405,7 @@ function ReportPage() {
                   value={formData.school}
                   onChange={(e) => updateFormData({ school: e.target.value })}
                   placeholder="School name"
+                  autoComplete="off"
                 />
               </FormControl>
               <FormControl>

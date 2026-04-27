@@ -377,6 +377,8 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
             "- Include specific, concrete examples",
             "- Be honest but encouraging",
             "- Total report should be approximately 150-300 words",
+            "- Do NOT use any emojis, emoticons, or Unicode icons anywhere in the report",
+            "- Use plain text section headers with numbering (e.g., '1. CURRENT PERFORMANCE LEVEL')",
             "",
             "Return the report as a single, well-formatted text block.",
         ])

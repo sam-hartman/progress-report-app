@@ -18,13 +18,11 @@ import {
   CardBody,
   CardHeader,
   Select,
-  FormControl,
-  FormLabel,
-  Checkbox,
-  Stack,
   Icon
 } from '@chakra-ui/react';
 import { FiArrowRight, FiEye, FiCopy, FiCheck, FiAlertCircle } from 'react-icons/fi';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../utils/api';
 import { useImages, useOCR, useSession, useNavigation } from '../stores/appStore';
@@ -36,9 +34,6 @@ function OCRPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-  const [language, setLanguage] = useState('eng');
-  const [enhanceImage, setEnhanceImage] = useState(true);
-  const [useMistral, setUseMistral] = useState(true);
   const [copied, setCopied] = useState(false);
   
   const { images, currentImageId } = useImages();
@@ -78,9 +73,9 @@ function OCRPage() {
     try {
       const result = await API.ocr.process({
         image_id: selectedImageId,
-        language,
-        enhance_image: enhanceImage,
-        use_mistral: useMistral,
+        language: 'eng',
+        enhance_image: false,
+        use_mistral: true,
       }, sessionId || undefined);
 
       clearInterval(progressInterval);
@@ -211,43 +206,6 @@ function OCRPage() {
         </Card>
       )}
       
-      {/* OCR Options */}
-      <Card>
-        <CardHeader>
-          <Text fontWeight="bold">OCR Options</Text>
-        </CardHeader>
-        <CardBody>
-          <Stack spacing={4}>
-            <FormControl>
-              <FormLabel>Language</FormLabel>
-              <Select 
-                value={language} 
-                onChange={(e) => setLanguage(e.target.value)}
-              >
-                <option value="eng">English</option>
-                <option value="spa">Spanish</option>
-                <option value="fra">French</option>
-                <option value="deu">German</option>
-              </Select>
-            </FormControl>
-            
-            <Checkbox 
-              isChecked={enhanceImage} 
-              onChange={(e) => setEnhanceImage(e.target.checked)}
-            >
-              Enhance image for better OCR results
-            </Checkbox>
-            
-            <Checkbox
-              isChecked={useMistral}
-              onChange={(e) => setUseMistral(e.target.checked)}
-            >
-              Use AI-powered OCR (more accurate)
-            </Checkbox>
-          </Stack>
-        </CardBody>
-      </Card>
-      
       {/* Process Button */}
       <Button 
         colorScheme="blue" 
@@ -290,19 +248,24 @@ function OCRPage() {
           </CardHeader>
           <CardBody>
             <Box
-              as="pre"
-              whiteSpace="pre-wrap"
-              overflowWrap="break-word"
-              fontFamily="monospace" 
-              fontSize="sm" 
-              bg="gray.50" 
-              p={4} 
+              bg="gray.50"
+              p={4}
               borderRadius="md"
               overflowX="auto"
-              maxH="400px"
+              maxH="500px"
               overflowY="auto"
+              fontSize="sm"
+              sx={{
+                'table': { width: '100%', borderCollapse: 'collapse', my: 3 },
+                'th, td': { border: '1px solid', borderColor: 'gray.300', px: 3, py: 2, textAlign: 'left' },
+                'th': { bg: 'blue.600', color: 'white', fontWeight: 'bold' },
+                'tr:nth-of-type(even)': { bg: 'gray.100' },
+                'h1, h2, h3': { mt: 3, mb: 1 },
+                'p': { my: 1 },
+                'ul, ol': { pl: 5 },
+              }}
             >
-              {ocrText}
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{ocrText}</ReactMarkdown>
             </Box>
           </CardBody>
         </Card>

@@ -42,6 +42,7 @@ import {
   FiClock,
   FiTrash2,
   FiArrowLeft,
+  FiInfo,
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -74,6 +75,7 @@ function ReportPage() {
   const [showOcrPreview, setShowOcrPreview] = useState(false);
   const [viewingReport, setViewingReport] = useState<ReportRecord | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const { images, addImage, removeImage } = useImages();
   const { upload, setUploadState } = useUpload();
@@ -81,6 +83,8 @@ function ReportPage() {
   const { formData, updateFormData } = useFormData();
   const { addSummary } = useSummary();
   const { reportHistory, addReportToHistory, removeReportFromHistory } = useReportHistory();
+
+  const isFirstVisit = reportHistory.length === 0 && images.length === 0 && !summaryText;
 
   // Create session on mount
   useEffect(() => {
@@ -92,9 +96,9 @@ function ReportPage() {
         } catch {
           toast({
             title: 'Connection error',
-            description: 'Could not connect to server.',
+            description: 'Could not connect to server. Please check your internet connection and refresh the page.',
             status: 'error',
-            duration: 5000,
+            duration: 8000,
             isClosable: true,
           });
         }
@@ -110,18 +114,18 @@ function ReportPage() {
 
     for (const file of acceptedFiles) {
       if (!file.type.startsWith('image/')) {
-        toast({ title: `${file.name} is not an image`, status: 'error', duration: 3000, isClosable: true });
+        toast({ title: `"${file.name}" is not an image. Please use JPG, PNG, or WebP files.`, status: 'error', duration: 5000, isClosable: true });
         continue;
       }
       if (file.size > 10 * 1024 * 1024) {
-        toast({ title: `${file.name} exceeds 10MB limit`, status: 'error', duration: 3000, isClosable: true });
+        toast({ title: `"${file.name}" is too large. Maximum file size is 10MB.`, status: 'error', duration: 5000, isClosable: true });
         continue;
       }
       try {
         const image = await API.image.upload(file, sessionId || undefined);
         addImage({ ...image, preview_url: URL.createObjectURL(file), status: 'uploaded' as const });
       } catch {
-        toast({ title: `Failed to upload ${file.name}`, status: 'error', duration: 3000, isClosable: true });
+        toast({ title: `Failed to upload "${file.name}". Please try again.`, status: 'error', duration: 5000, isClosable: true });
       }
     }
     setUploadState({ is_uploading: false, upload_progress: 100, error: null });
@@ -137,7 +141,7 @@ function ReportPage() {
   // Camera capture
   const captureImage = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      toast({ title: 'Camera not available', status: 'error', duration: 3000, isClosable: true });
+      toast({ title: 'Camera not available on this device.', status: 'error', duration: 5000, isClosable: true });
       return;
     }
     try {
@@ -164,7 +168,7 @@ function ReportPage() {
         }, 'image/jpeg', 0.9);
       }
     } catch {
-      toast({ title: 'Failed to access camera', status: 'error', duration: 3000, isClosable: true });
+      toast({ title: 'Could not access your camera. Please check your browser permissions.', status: 'error', duration: 5000, isClosable: true });
     }
   };
 
@@ -183,7 +187,7 @@ function ReportPage() {
 
       for (let idx = 0; idx < images.length; idx++) {
         const image = images[idx];
-        setGenerationStatus(`Step ${idx + 1} of ${totalSteps} -- Extracting text from ${image.filename}`);
+        setGenerationStatus(`Step ${idx + 1} of ${totalSteps}: Reading text from "${image.filename}"`);
         const result = await API.ocr.process({
           image_id: image.image_id, language: 'eng', enhance_image: false, use_mistral: true,
         }, sessionId || undefined);
@@ -194,7 +198,7 @@ function ReportPage() {
       setOcrPreviewTexts(ocrPreviews);
       const combinedText = ocrTexts.join('\n\n---\n\n');
 
-      setGenerationStatus(`Step ${totalSteps} of ${totalSteps} -- Writing progress report`);
+      setGenerationStatus(`Step ${totalSteps} of ${totalSteps}: Writing your progress report`);
       const result = await API.summary.generate({
         text: combinedText,
         template: 'maryland_qpr',
@@ -224,7 +228,7 @@ function ReportPage() {
         processingTime: result.processing_time,
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Report generation failed';
+      const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setError(message);
       setGenerationStatus('');
     } finally {
@@ -236,6 +240,7 @@ function ReportPage() {
     if (!summaryText) return;
     navigator.clipboard.writeText(summaryText).then(() => {
       setCopied(true);
+      toast({ title: 'Report copied to clipboard. You can now paste it anywhere.', status: 'success', duration: 3000, isClosable: true });
       setTimeout(() => setCopied(false), 2000);
     });
   };
@@ -247,8 +252,9 @@ function ReportPage() {
     const filename = `progress_report_${formData.student_name || 'student'}_${Date.now()}.docx`;
     try {
       await downloadAsDocx(summaryText, filename);
+      toast({ title: 'Word document downloaded. Check your Downloads folder.', status: 'success', duration: 4000, isClosable: true });
     } catch {
-      toast({ title: 'Download failed', status: 'error', duration: 3000, isClosable: true });
+      toast({ title: 'Download failed. Please try again.', status: 'error', duration: 5000, isClosable: true });
     }
   };
 
@@ -283,11 +289,53 @@ function ReportPage() {
       <VStack spacing={5} align="stretch">
 
         {!viewingReport && (<>
-        {/* Upload */}
+
+        {/* Welcome / How It Works */}
+        {isFirstVisit && (
+          <Card variant="outline" bg="brand.50" borderColor="brand.200">
+            <CardBody py={4}>
+              <Text fontSize="md" fontWeight={700} color="brand.800" mb={2}>
+                Welcome! This tool helps you create quarterly progress reports.
+              </Text>
+              <Text fontSize="sm" color="gray.700" lineHeight={1.7} mb={3}>
+                Upload a photo or scan of student work, fill in a few details, and this tool will
+                read the student's work and write a complete Maryland-format progress report for you.
+                You can then download it as a Word document, print it, or copy and paste it.
+              </Text>
+              <Flex
+                align="center"
+                cursor="pointer"
+                onClick={() => setShowHowItWorks(!showHowItWorks)}
+                _hover={{ color: 'brand.700' }}
+              >
+                <Icon as={FiInfo} color="brand.600" mr={2} boxSize={4} />
+                <Text fontSize="sm" fontWeight={600} color="brand.600">
+                  {showHowItWorks ? 'Hide details' : 'How does it work? (click to expand)'}
+                </Text>
+                <Icon as={showHowItWorks ? FiChevronUp : FiChevronDown} color="brand.500" ml={1} boxSize={4} />
+              </Flex>
+              {showHowItWorks && (
+                <Box mt={3} pl={2} borderLeft="3px solid" borderColor="brand.300">
+                  <VStack align="start" spacing={2} fontSize="sm" color="gray.700">
+                    <Text><Text as="span" fontWeight={700} color="brand.700">Step 1:</Text> Take a photo of student work (a worksheet, test, writing sample, etc.) or select an image from your computer.</Text>
+                    <Text><Text as="span" fontWeight={700} color="brand.700">Step 2:</Text> Fill in the student's name, grade, subject, and other details. Only the grade and subject are required.</Text>
+                    <Text><Text as="span" fontWeight={700} color="brand.700">Step 3:</Text> Click "Generate Report." The tool will read the text from the image and write a progress report based on what it finds.</Text>
+                    <Text><Text as="span" fontWeight={700} color="brand.700">Step 4:</Text> Review the report. You can download it as a Word document, print it, or copy the text. All reports are saved automatically so you can come back to them later.</Text>
+                  </VStack>
+                </Box>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Step 1: Upload */}
         <Card variant="outline">
           <CardBody>
-            <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={3}>
-              Student Work
+            <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={1}>
+              Step 1: Upload Student Work
+            </Text>
+            <Text fontSize="xs" color="gray.500" mb={3}>
+              Take a photo or upload an image of a worksheet, test, quiz, or writing sample. You can add multiple images for the same student.
             </Text>
 
             <Box
@@ -304,19 +352,22 @@ function ReportPage() {
             >
               <input {...getInputProps()} />
               <Icon as={FiUpload} boxSize={6} color="gray.400" mb={2} />
-              <Text fontSize="sm" color="gray.600" mb={2}>
-                {isDragActive ? 'Drop files here' : 'Drag and drop images, or'}
+              <Text fontSize="sm" color="gray.600" mb={1}>
+                {isDragActive ? 'Drop your files here' : 'Drag and drop images here, or'}
               </Text>
               <Button size="sm" variant="outline" colorScheme="blue" onClick={open} isDisabled={upload.is_uploading}>
                 Browse Files
               </Button>
+              <Text fontSize="xs" color="gray.400" mt={2}>
+                Accepts JPG, PNG, and WebP images up to 10MB each
+              </Text>
             </Box>
 
             <Button
               leftIcon={<FiCamera />} size="xs" variant="ghost" color="gray.500"
               onClick={captureImage} isDisabled={upload.is_uploading}
             >
-              Use Camera
+              Take Photo with Camera
             </Button>
 
             {upload.error && (
@@ -327,57 +378,59 @@ function ReportPage() {
             )}
 
             {images.length > 0 && (
-              <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2} mt={3}>
-                {images.map((image) => (
-                  <Box
-                    key={image.image_id}
-                    position="relative"
-                    borderRadius="md"
-                    overflow="hidden"
-                    border="1px solid"
-                    borderColor="gray.200"
-                    bg="white"
-                  >
-                    {image.preview_url && (
-                      <Image src={image.preview_url} alt={image.filename} h="80px" w="100%" objectFit="cover" />
-                    )}
-                    <Flex align="center" justify="space-between" px={2} py={1}>
-                      <Text fontSize="2xs" color="gray.500" noOfLines={1} flex={1}>{image.filename}</Text>
-                      <IconButton
-                        aria-label="Remove"
-                        icon={<FiX />}
-                        size="xs"
-                        variant="ghost"
-                        color="gray.400"
-                        _hover={{ color: 'red.500' }}
-                        onClick={() => removeImage(image.image_id)}
-                      />
-                    </Flex>
-                  </Box>
-                ))}
-              </SimpleGrid>
+              <>
+                <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2} mt={3}>
+                  {images.map((image) => (
+                    <Box
+                      key={image.image_id}
+                      position="relative"
+                      borderRadius="md"
+                      overflow="hidden"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      bg="white"
+                    >
+                      {image.preview_url && (
+                        <Image src={image.preview_url} alt={image.filename} h="80px" w="100%" objectFit="cover" />
+                      )}
+                      <Flex align="center" justify="space-between" px={2} py={1}>
+                        <Text fontSize="2xs" color="gray.500" noOfLines={1} flex={1}>{image.filename}</Text>
+                        <IconButton
+                          aria-label="Remove this image"
+                          icon={<FiX />}
+                          size="xs"
+                          variant="ghost"
+                          color="gray.400"
+                          _hover={{ color: 'red.500' }}
+                          onClick={() => removeImage(image.image_id)}
+                        />
+                      </Flex>
+                    </Box>
+                  ))}
+                </SimpleGrid>
+                <Text fontSize="xs" color="gray.400" mt={2}>
+                  {images.length} image{images.length !== 1 ? 's' : ''} ready. You can add more or remove any by clicking the X.
+                </Text>
+              </>
             )}
 
             {upload.is_uploading && (
               <Flex align="center" gap={2} mt={2}>
                 <Spinner size="xs" color="brand.500" />
-                <Text fontSize="xs" color="gray.500">Uploading...</Text>
+                <Text fontSize="xs" color="gray.500">Uploading your image...</Text>
               </Flex>
-            )}
-
-            {images.length > 0 && (
-              <Text fontSize="xs" color="gray.400" mt={2}>
-                {images.length} file{images.length !== 1 ? 's' : ''} attached
-              </Text>
             )}
           </CardBody>
         </Card>
 
-        {/* Student Information */}
+        {/* Step 2: Student Information */}
         <Card variant="outline">
           <CardBody>
-            <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={3}>
-              Student Information
+            <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={1}>
+              Step 2: Student Information
+            </Text>
+            <Text fontSize="xs" color="gray.500" mb={3}>
+              Fill in what you know. Only the grade and subject are required -- the rest is optional but will make the report more specific.
             </Text>
 
             <Stack spacing={3} direction={{ base: 'column', md: 'row' }}>
@@ -387,20 +440,20 @@ function ReportPage() {
                   size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
                   value={formData.student_name}
                   onChange={(e) => updateFormData({ student_name: e.target.value })}
-                  placeholder="Name"
+                  placeholder="e.g. Sarah Chen"
                   autoComplete="one-time-code"
                   name="student_name_nofill"
                   data-lpignore="true"
                   data-form-type="other"
                 />
               </FormControl>
-              <FormControl>
+              <FormControl isRequired>
                 <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Grade</FormLabel>
                 <Select size="sm" borderColor="gray.300" value={formData.grade_level} onChange={(e) => updateFormData({ grade_level: e.target.value })}>
                   {MARYLAND_GRADES.map((g: string) => <option key={g} value={g}>{g}</option>)}
                 </Select>
               </FormControl>
-              <FormControl>
+              <FormControl isRequired>
                 <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Subject</FormLabel>
                 <Select size="sm" borderColor="gray.300" value={formData.subject} onChange={(e) => updateFormData({ subject: e.target.value })}>
                   {MARYLAND_SUBJECTS.map((s: string) => <option key={s} value={s}>{s}</option>)}
@@ -412,12 +465,12 @@ function ReportPage() {
 
             <Stack spacing={3} direction={{ base: 'column', md: 'row' }}>
               <FormControl>
-                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Teacher</FormLabel>
+                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Teacher Name</FormLabel>
                 <Input
                   size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
                   value={formData.teacher_name}
                   onChange={(e) => updateFormData({ teacher_name: e.target.value })}
-                  placeholder="Name"
+                  placeholder="e.g. Ms. Rivera"
                   autoComplete="one-time-code"
                   name="teacher_name_nofill"
                   data-lpignore="true"
@@ -430,7 +483,7 @@ function ReportPage() {
                   size="sm" borderColor="gray.300" _hover={{ borderColor: 'gray.400' }}
                   value={formData.school}
                   onChange={(e) => updateFormData({ school: e.target.value })}
-                  placeholder="School name"
+                  placeholder="e.g. Parkview Elementary"
                   autoComplete="one-time-code"
                   name="school_nofill"
                   data-lpignore="true"
@@ -438,7 +491,7 @@ function ReportPage() {
                 />
               </FormControl>
               <FormControl>
-                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Period</FormLabel>
+                <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Reporting Period</FormLabel>
                 <Select size="sm" borderColor="gray.300" value={formData.reporting_period} onChange={(e) => updateFormData({ reporting_period: e.target.value })}>
                   {REPORTING_PERIODS.map((p: string) => <option key={p} value={p}>{p}</option>)}
                 </Select>
@@ -447,6 +500,9 @@ function ReportPage() {
 
             <Divider my={3} borderColor="gray.200" />
 
+            <Text fontSize="xs" color="gray.500" mb={2}>
+              Check the boxes below to include additional sections in the report:
+            </Text>
             <HStack spacing={5}>
               <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_standards} onChange={(e) => updateFormData({ include_standards: e.target.checked })}>
                 <Text fontSize="xs" color="gray.600">Maryland Standards</Text>
@@ -455,34 +511,52 @@ function ReportPage() {
                 <Text fontSize="xs" color="gray.600">IEP Goals</Text>
               </Checkbox>
               <Checkbox size="sm" colorScheme="blue" isChecked={formData.include_behavioral} onChange={(e) => updateFormData({ include_behavioral: e.target.checked })}>
-                <Text fontSize="xs" color="gray.600">Behavioral</Text>
+                <Text fontSize="xs" color="gray.600">Behavioral Notes</Text>
               </Checkbox>
             </HStack>
           </CardBody>
         </Card>
 
-        {/* Generate */}
-        <Button
-          bg="brand.700"
-          color="white"
-          _hover={{ bg: 'brand.800' }}
-          _active={{ bg: 'brand.900' }}
-          size="md"
-          onClick={generateReport}
-          isLoading={isGenerating}
-          loadingText={generationStatus || 'Processing...'}
-          isDisabled={images.length === 0 || upload.is_uploading}
-          fontWeight={600}
-          letterSpacing="0.01em"
-        >
-          Generate Report
-        </Button>
+        {/* Step 3: Generate */}
+        <Box>
+          <Button
+            bg="brand.700"
+            color="white"
+            _hover={{ bg: 'brand.800' }}
+            _active={{ bg: 'brand.900' }}
+            size="lg"
+            w="100%"
+            onClick={generateReport}
+            isLoading={isGenerating}
+            loadingText={generationStatus || 'Working on it...'}
+            isDisabled={images.length === 0 || upload.is_uploading}
+            fontWeight={600}
+            letterSpacing="0.01em"
+          >
+            {images.length === 0 ? 'Upload an Image First' : 'Generate Progress Report'}
+          </Button>
+          {images.length === 0 && !summaryText && (
+            <Text fontSize="xs" color="gray.400" textAlign="center" mt={2}>
+              Upload at least one image of student work above to get started.
+            </Text>
+          )}
+          {isGenerating && (
+            <Text fontSize="xs" color="gray.500" textAlign="center" mt={2}>
+              This usually takes 15-30 seconds. Please don't close this page.
+            </Text>
+          )}
+        </Box>
 
         {/* Error */}
         {error && (
-          <Alert status="error" borderRadius="md" py={2}>
+          <Alert status="error" borderRadius="md" py={3}>
             <AlertIcon boxSize={4} />
-            <AlertDescription fontSize="sm">{error}</AlertDescription>
+            <AlertDescription fontSize="sm">
+              {error}
+              <Text fontSize="xs" color="gray.500" mt={1}>
+                If this keeps happening, try refreshing the page or uploading a clearer image.
+              </Text>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -499,14 +573,19 @@ function ReportPage() {
               >
                 <HStack spacing={2}>
                   <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
-                    Extracted Text
+                    What We Read From Your Image
                   </Text>
                   <Badge colorScheme="blue" fontSize="2xs" variant="subtle">
-                    {ocrPreviewTexts.length} source{ocrPreviewTexts.length !== 1 ? 's' : ''}
+                    {ocrPreviewTexts.length} image{ocrPreviewTexts.length !== 1 ? 's' : ''}
                   </Badge>
                 </HStack>
                 <Icon as={showOcrPreview ? FiChevronUp : FiChevronDown} color="gray.400" boxSize={4} />
               </Flex>
+              {!showOcrPreview && (
+                <Text fontSize="xs" color="gray.400" mt={1}>
+                  Click to see the text that was extracted from your image{ocrPreviewTexts.length !== 1 ? 's' : ''}. This is what the report is based on.
+                </Text>
+              )}
 
               {showOcrPreview && (
                 <VStack spacing={3} align="stretch" mt={3}>
@@ -531,30 +610,32 @@ function ReportPage() {
           </Card>
         )}
 
-        {/* Report Output */}
+        {/* Step 4: Report Output */}
         {summaryText && (
           <Card variant="outline">
             <CardBody>
-              <Flex justify="space-between" align="center" mb={4} flexWrap="wrap" gap={2}>
-                <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
-                  Progress Report
-                </Text>
-                <HStack spacing={1}>
-                  <Button
-                    leftIcon={copied ? <FiCheck /> : <FiCopy />}
-                    size="xs" variant="ghost" color="gray.500"
-                    onClick={copyToClipboard}
-                    _hover={{ color: 'brand.600' }}
-                  >
-                    {copied ? 'Copied' : 'Copy'}
-                  </Button>
-                  <Button leftIcon={<FiPrinter />} size="xs" variant="ghost" color="gray.500" onClick={handlePrint} _hover={{ color: 'brand.600' }}>
-                    Print
-                  </Button>
-                  <Button leftIcon={<FiDownload />} size="xs" variant="ghost" color="gray.500" onClick={handleDownload} _hover={{ color: 'brand.600' }}>
-                    Word
-                  </Button>
-                </HStack>
+              <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={1}>
+                Your Progress Report
+              </Text>
+              <Text fontSize="xs" color="gray.500" mb={3}>
+                Review the report below. You can copy it, print it, or download it as a Word document.
+                This report has been saved automatically -- you can find it in "Past Reports" at the bottom of the page.
+              </Text>
+
+              <Flex justify="flex-end" mb={3} flexWrap="wrap" gap={1}>
+                <Button
+                  leftIcon={copied ? <FiCheck /> : <FiCopy />}
+                  size="sm" variant="outline" colorScheme={copied ? 'green' : 'gray'}
+                  onClick={copyToClipboard}
+                >
+                  {copied ? 'Copied!' : 'Copy Text'}
+                </Button>
+                <Button leftIcon={<FiPrinter />} size="sm" variant="outline" colorScheme="gray" onClick={handlePrint}>
+                  Print
+                </Button>
+                <Button leftIcon={<FiDownload />} size="sm" variant="outline" colorScheme="blue" onClick={handleDownload}>
+                  Download Word Doc
+                </Button>
               </Flex>
 
               <Box
@@ -573,18 +654,17 @@ function ReportPage() {
           </Card>
         )}
 
-        {/* Reset */}
+        {/* Start another report */}
         {summaryText && (
           <Flex justify="center" pb={4}>
             <Button
               leftIcon={<FiRefreshCw />}
               onClick={handleStartOver}
               size="sm"
-              variant="ghost"
-              color="gray.400"
-              _hover={{ color: 'gray.600' }}
+              variant="outline"
+              colorScheme="gray"
             >
-              New Report
+              Start a New Report for Another Student
             </Button>
           </Flex>
         )}
@@ -596,26 +676,28 @@ function ReportPage() {
             <Flex align="center" mb={2}>
               <Button
                 leftIcon={<FiArrowLeft />}
-                size="xs"
+                size="sm"
                 variant="ghost"
                 color="gray.500"
                 onClick={() => setViewingReport(null)}
                 _hover={{ color: 'brand.600' }}
               >
-                Back
+                Back to Report Generator
               </Button>
-              <Text fontSize="xs" color="gray.400" ml={2}>
-                {new Date(viewingReport.createdAt).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-                })}
-              </Text>
             </Flex>
 
             <Card variant="outline" mb={3}>
               <CardBody py={3}>
-                <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={2}>
-                  Report Details
-                </Text>
+                <Flex justify="space-between" align="center" mb={2}>
+                  <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
+                    Saved Report
+                  </Text>
+                  <Text fontSize="xs" color="gray.400">
+                    Created {new Date(viewingReport.createdAt).toLocaleDateString('en-US', {
+                      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                    })}
+                  </Text>
+                </Flex>
                 <SimpleGrid columns={{ base: 2, md: 3 }} spacing={2} fontSize="xs" color="gray.600">
                   {viewingReport.formData.student_name && (
                     <Text><Text as="span" fontWeight={600}>Student:</Text> {viewingReport.formData.student_name}</Text>
@@ -632,7 +714,7 @@ function ReportPage() {
                 </SimpleGrid>
                 {viewingReport.imageFilenames.length > 0 && (
                   <Text fontSize="xs" color="gray.400" mt={2}>
-                    Sources: {viewingReport.imageFilenames.join(', ')}
+                    Based on: {viewingReport.imageFilenames.join(', ')}
                   </Text>
                 )}
               </CardBody>
@@ -653,7 +735,7 @@ function ReportPage() {
                         Extracted Text
                       </Text>
                       <Badge colorScheme="blue" fontSize="2xs" variant="subtle">
-                        {viewingReport.ocrTexts.length} source{viewingReport.ocrTexts.length !== 1 ? 's' : ''}
+                        {viewingReport.ocrTexts.length} image{viewingReport.ocrTexts.length !== 1 ? 's' : ''}
                       </Badge>
                     </HStack>
                     <Icon as={showOcrPreview ? FiChevronUp : FiChevronDown} color="gray.400" boxSize={4} />
@@ -678,28 +760,28 @@ function ReportPage() {
 
             <Card variant="outline">
               <CardBody>
-                <Flex justify="space-between" align="center" mb={4} flexWrap="wrap" gap={2}>
-                  <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
-                    Progress Report
-                  </Text>
-                  <HStack spacing={1}>
-                    <Button
-                      leftIcon={<FiCopy />} size="xs" variant="ghost" color="gray.500"
-                      onClick={() => { navigator.clipboard.writeText(viewingReport.summaryText); }}
-                      _hover={{ color: 'brand.600' }}
-                    >
-                      Copy
-                    </Button>
-                    <Button leftIcon={<FiDownload />} size="xs" variant="ghost" color="gray.500"
-                      onClick={async () => {
-                        const fn = `progress_report_${viewingReport.formData.student_name || 'student'}_${Date.now()}.docx`;
-                        await downloadAsDocx(viewingReport.summaryText, fn);
-                      }}
-                      _hover={{ color: 'brand.600' }}
-                    >
-                      Word
-                    </Button>
-                  </HStack>
+                <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={3}>
+                  Progress Report
+                </Text>
+                <Flex justify="flex-end" mb={3} gap={1}>
+                  <Button
+                    leftIcon={<FiCopy />} size="sm" variant="outline" colorScheme="gray"
+                    onClick={() => {
+                      navigator.clipboard.writeText(viewingReport.summaryText);
+                      toast({ title: 'Report copied to clipboard.', status: 'success', duration: 3000, isClosable: true });
+                    }}
+                  >
+                    Copy Text
+                  </Button>
+                  <Button leftIcon={<FiDownload />} size="sm" variant="outline" colorScheme="blue"
+                    onClick={async () => {
+                      const fn = `progress_report_${viewingReport.formData.student_name || 'student'}_${Date.now()}.docx`;
+                      await downloadAsDocx(viewingReport.summaryText, fn);
+                      toast({ title: 'Word document downloaded.', status: 'success', duration: 3000, isClosable: true });
+                    }}
+                  >
+                    Download Word Doc
+                  </Button>
                 </Flex>
                 <Box className="report-output" p={5} borderRadius="md" border="1px solid" borderColor="gray.200" bg="white" fontSize="sm" sx={markdownStyles}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingReport.summaryText}</ReactMarkdown>
@@ -731,6 +813,11 @@ function ReportPage() {
                 </HStack>
                 <Icon as={showHistory ? FiChevronUp : FiChevronDown} color="gray.400" boxSize={4} />
               </Flex>
+              {!showHistory && (
+                <Text fontSize="xs" color="gray.400" mt={1}>
+                  Click to see reports you've created before. You can view, download, or delete them.
+                </Text>
+              )}
 
               {showHistory && (
                 <VStack spacing={2} align="stretch" mt={3}>
@@ -752,18 +839,18 @@ function ReportPage() {
                         <Text fontSize="sm" fontWeight={600} color="gray.700" noOfLines={1}>
                           {report.formData.student_name || 'Unnamed Student'}
                           <Text as="span" fontWeight={400} color="gray.500">
-                            {' -- '}{report.formData.subject}, {report.formData.grade_level}
+                            {' -- '}{report.formData.subject}, Grade {report.formData.grade_level}
                           </Text>
                         </Text>
                         <Text fontSize="xs" color="gray.400">
                           {new Date(report.createdAt).toLocaleDateString('en-US', {
-                            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
                           })}
                           {' -- '}{report.imageFilenames.length} image{report.imageFilenames.length !== 1 ? 's' : ''}
                         </Text>
                       </Box>
                       <IconButton
-                        aria-label="Delete report"
+                        aria-label="Delete this report"
                         icon={<FiTrash2 />}
                         size="xs"
                         variant="ghost"

@@ -143,7 +143,7 @@ function ReportPage() {
     setUploadState({ is_uploading: false, upload_progress: 100, error: null });
   }, [addImage, sessionId, setUploadState, toast]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       'image/jpeg': ['.jpeg', '.jpg'],
@@ -151,6 +151,7 @@ function ReportPage() {
       'image/webp': ['.webp'],
     },
     multiple: true,
+    noClick: true,
   });
 
   // Camera capture
@@ -320,17 +321,23 @@ function ReportPage() {
             borderRadius="lg"
             p={6}
             textAlign="center"
-            cursor="pointer"
             transition="all 0.2s"
             bg={isDragActive ? 'blue.50' : 'gray.50'}
-            _hover={{ bg: 'gray.100' }}
             mb={4}
           >
             <input {...getInputProps()} />
             <Icon as={FiUpload} boxSize={8} color="gray.400" mb={2} />
-            <Text fontWeight="medium">
-              {isDragActive ? 'Drop images here' : 'Drag & drop images, or click to browse'}
+            <Text fontWeight="medium" mb={3}>
+              {isDragActive ? 'Drop images here' : 'Drag & drop images here'}
             </Text>
+            <Button
+              size="sm"
+              colorScheme="blue"
+              onClick={open}
+              isDisabled={upload.is_uploading}
+            >
+              Browse Files
+            </Button>
           </Box>
 
           {/* Camera button */}

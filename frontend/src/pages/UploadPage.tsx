@@ -1,15 +1,13 @@
-"""
-Upload page for images
-"""
+// Upload page for images
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { 
-  Box, 
-  Button, 
-  Flex, 
-  Heading, 
-  Text, 
-  VStack, 
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Text,
+  VStack,
   useToast,
   Image,
   Icon,
@@ -21,7 +19,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  useDisclosure
 } from '@chakra-ui/react';
 import { FiUpload, FiCamera, FiX, FiCheckCircle, FiImage } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
@@ -31,14 +28,12 @@ import { useAppStore, useImages, useUpload, useSession } from '../stores/appStor
 function UploadPage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { isOpen: isDragging, onOpen: setDragging, onClose: setNotDragging } = useDisclosure();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [capturedImage, setCapturedImage] = useState<File | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   
-  const { images, addImage, removeImage, currentImageId, setCurrentImageId } = useImages();
+  const { images, addImage, removeImage } = useImages();
   const { upload, setUploadState, resetUpload } = useUpload();
-  const { sessionId, createSession } = useSession();
+  const { sessionId } = useSession();
   
   // Create session if doesn't exist
   useEffect(() => {
@@ -136,11 +131,10 @@ function UploadPage() {
   }, [addImage, sessionId, setUploadState, toast]);
   
   // Dropzone configuration
-  const { 
-    getRootProps, 
-    getInputProps, 
+  const {
+    getRootProps,
+    getInputProps,
     isDragActive,
-    fileRejections 
   } = useDropzone({
     onDrop,
     accept: {
@@ -150,8 +144,8 @@ function UploadPage() {
     },
     maxFiles: 1,
     multiple: false,
-    onDragEnter: () => setDragging(),
-    onDragLeave: () => setNotDragging(),
+    onDragEnter: () => {},
+    onDragLeave: () => {},
   });
   
   // Capture image from camera
@@ -199,7 +193,6 @@ function UploadPage() {
         canvas.toBlob(async (blob) => {
           if (blob) {
             const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-            setCapturedImage(file);
             
             // Upload the captured image
             const image = await API.image.upload(file, sessionId || undefined);

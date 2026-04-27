@@ -1,14 +1,12 @@
-"""
-OCR processing page
-"""
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Button, 
-  Flex, 
-  Heading, 
-  Text, 
-  VStack, 
+// OCR processing page
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Text,
+  VStack,
   useToast,
   Spinner,
   Progress,
@@ -19,7 +17,6 @@ import {
   Card,
   CardBody,
   CardHeader,
-  Textarea,
   Select,
   FormControl,
   FormLabel,
@@ -73,29 +70,29 @@ function OCRPage() {
     setProgress(0);
     setOCRState({ is_processing: true, progress: 0, error: null });
     
+    // Simulate progress — declared outside try/catch so catch can clear it
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 10, 90));
+    }, 200);
+
     try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90));
-      }, 200);
-      
       const result = await API.ocr.process({
         image_id: selectedImageId,
         language,
         enhance_image: enhanceImage,
         use_mistral: useMistral,
       }, sessionId || undefined);
-      
+
       clearInterval(progressInterval);
       setProgress(100);
-      
+
       // Store result
       addOCRResult(selectedImageId, result);
       setOcrText(result.text);
-      
+
       setOCRState({ is_processing: false, progress: 100, error: null });
       setIsProcessing(false);
-      
+
       toast({
         title: 'OCR Complete',
         description: `Text extracted successfully using ${result.model_used}`,
@@ -103,7 +100,7 @@ function OCRPage() {
         duration: 3000,
         isClosable: true,
       });
-      
+
     } catch (error) {
       clearInterval(progressInterval);
       setIsProcessing(false);
@@ -298,10 +295,10 @@ function OCRPage() {
             </Button>
           </CardHeader>
           <CardBody>
-            <Box 
-              as="pre" 
-              whiteSpace="pre-wrap" 
-              wordWrap="break-word" 
+            <Box
+              as="pre"
+              whiteSpace="pre-wrap"
+              overflowWrap="break-word"
               fontFamily="monospace" 
               fontSize="sm" 
               bg="gray.50" 

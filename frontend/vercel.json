@@ -1,24 +1,19 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "source": "/api/:path*",
+      "destination": "https://qpr-backend.fly.dev/api/:path*"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/api/(.*)",
-      "dest": "https://qpr-backend.up.railway.app/api/$1",
-      "headers": { "Access-Control-Allow-Origin": "*" }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/"
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
     }
-  ],
-  "env": {
-    "VITE_API_URL": "https://qpr-backend.up.railway.app/api"
-  }
+  ]
 }

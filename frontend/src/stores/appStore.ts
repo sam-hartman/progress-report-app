@@ -1,11 +1,21 @@
-"""
-Zustand store for application state
-"""
+// Zustand store for application state
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { AppState, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
+import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
 
-const initialState: AppState = {
+export { MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS };
+
+// Data-only portion of AppState (no action methods)
+type AppData = Omit<AppState,
+  'setSessionId' | 'addSession' | 'createSession' | 'addImage' | 'setCurrentImageId' |
+  'removeImage' | 'setUploadState' | 'resetUpload' | 'addOCRResult' | 'setOCRState' |
+  'resetOCR' | 'setExtractedTables' | 'setSelectedTableIds' | 'toggleTableSelection' |
+  'addSummary' | 'setCurrentSummaryId' | 'setSummaryState' | 'resetSummary' |
+  'updateFormData' | 'setCurrentStep' | 'goToUpload' | 'goToOCR' | 'goToTables' |
+  'goToSummary' | 'setIsMobile' | 'setHasCameraAccess' | 'resetAll'
+>;
+
+const initialState: AppData = {
   // Session
   sessionId: null,
   sessions: [],
@@ -61,17 +71,17 @@ const initialState: AppState = {
 export const useAppStore = create<AppState>()(
   devtools(
     persist(
-      (set, get) => ({
+      (set, _get) => ({
         ...initialState,
         
         // Actions
         setSessionId: (sessionId: string | null) => set({ sessionId }),
         
-        addSession: (session: any) => set((state) => ({
+        addSession: (session: SessionType) => set((state) => ({
           sessions: [...state.sessions, session],
         })),
-        
-        addImage: (image: any) => set((state) => ({
+
+        addImage: (image: ImageType & { preview_url?: string }) => set((state) => ({
           images: [...state.images, image],
           currentImageId: image.image_id,
         })),
@@ -87,7 +97,7 @@ export const useAppStore = create<AppState>()(
           upload: { ...state.upload, ...upload },
         })),
         
-        addOCRResult: (imageId: string, result: any) => set((state) => ({
+        addOCRResult: (imageId: string, result: OCRResult) => set((state) => ({
           ocrResults: { ...state.ocrResults, [imageId]: result },
         })),
         
@@ -95,7 +105,7 @@ export const useAppStore = create<AppState>()(
           ocr: { ...state.ocr, ...ocr },
         })),
         
-        setExtractedTables: (tables: any[]) => set({ extractedTables: tables }),
+        setExtractedTables: (tables: TableData[]) => set({ extractedTables: tables }),
         
         setSelectedTableIds: (tableIds: string[]) => set({ selectedTableIds: tableIds }),
         
@@ -109,9 +119,9 @@ export const useAppStore = create<AppState>()(
           return { selectedTableIds: Array.from(selected) };
         }),
         
-        addSummary: (summary: any) => set((state) => ({
+        addSummary: (summary: GenerateSummaryResponse) => set((state) => ({
           summaries: [...state.summaries, summary],
-          currentSummaryId: summary.summary_id || summary.completed_at,
+          currentSummaryId: summary.completed_at,
         })),
         
         setCurrentSummaryId: (summaryId: string | null) => set({ currentSummaryId: summaryId }),

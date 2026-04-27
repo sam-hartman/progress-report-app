@@ -1,6 +1,4 @@
-"""
-Main App component with routing and layout
-"""
+// Main App component with routing and layout
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useMediaQuery } from '@chakra-ui/react';

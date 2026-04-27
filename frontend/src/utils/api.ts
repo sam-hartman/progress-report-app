@@ -1,6 +1,4 @@
-"""
-API client for the backend service
-"""
+// API client for the backend service
 import { 
   ImageType, 
   OCRResult, 
@@ -68,7 +66,7 @@ export const ImageAPI = {
     return handleResponse<ImageType>(response);
   },
   
-  getPreviewUrl: (imageId: string): string => {
+  getPreviewUrl: (_imageId: string): string => {
     // In production, you might have an endpoint to serve images
     // For now, we'll use a placeholder or the client-side preview
     return URL.createObjectURL(new Blob());

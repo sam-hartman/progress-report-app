@@ -143,25 +143,25 @@ export interface AppState {
   // Session
   sessionId: string | null;
   sessions: SessionType[];
-  
+
   // Upload
   images: ImageType[];
   currentImageId: string | null;
   upload: UploadState;
-  
+
   // OCR
   ocrResults: Record<string, OCRResult>;
   ocr: OCRState;
-  
+
   // Tables
   extractedTables: TableData[];
   selectedTableIds: string[];
-  
+
   // Summary
   summaries: GenerateSummaryResponse[];
   currentSummaryId: string | null;
   summary: SummaryState;
-  
+
   // Form data for summary generation
   formData: {
     student_name: string;
@@ -174,11 +174,40 @@ export interface AppState {
     include_iep_goals: boolean;
     include_behavioral: boolean;
   };
-  
+
   // UI state
   currentStep: 'upload' | 'ocr' | 'tables' | 'summary';
   is_mobile: boolean;
   has_camera_access: boolean;
+
+  // Actions
+  setSessionId: (sessionId: string | null) => void;
+  addSession: (session: SessionType) => void;
+  createSession?: () => void;
+  addImage: (image: ImageType & { preview_url?: string }) => void;
+  setCurrentImageId: (imageId: string | null) => void;
+  removeImage: (imageId: string) => void;
+  setUploadState: (upload: Partial<UploadState>) => void;
+  resetUpload: () => void;
+  addOCRResult: (imageId: string, result: OCRResult) => void;
+  setOCRState: (ocr: Partial<OCRState>) => void;
+  resetOCR: () => void;
+  setExtractedTables: (tables: TableData[]) => void;
+  setSelectedTableIds: (tableIds: string[]) => void;
+  toggleTableSelection: (tableId: string) => void;
+  addSummary: (summary: GenerateSummaryResponse) => void;
+  setCurrentSummaryId: (summaryId: string | null) => void;
+  setSummaryState: (summary: Partial<SummaryState>) => void;
+  resetSummary: () => void;
+  updateFormData: (updates: Partial<AppState['formData']>) => void;
+  setCurrentStep: (step: AppState['currentStep']) => void;
+  goToUpload: () => void;
+  goToOCR: () => void;
+  goToTables: () => void;
+  goToSummary: () => void;
+  setIsMobile: (isMobile: boolean) => void;
+  setHasCameraAccess: (hasAccess: boolean) => void;
+  resetAll: () => void;
 }
 
 // Maryland-specific types

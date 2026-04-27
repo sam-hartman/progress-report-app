@@ -1,14 +1,12 @@
-"""
-Summary generation page
-"""
+// Summary generation page
 import { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  Flex, 
-  Heading, 
-  Text, 
-  VStack, 
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Text,
+  VStack,
   useToast,
   Spinner,
   Alert,
@@ -24,10 +22,7 @@ import {
   Select,
   Checkbox,
   Stack,
-  Icon,
-  Badge,
   Divider,
-  useDisclosure
 } from '@chakra-ui/react';
 import { 
   FiArrowLeft, 
@@ -39,14 +34,14 @@ import {
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../utils/api';
-import { 
-  useOCR, 
-  useSummary, 
+import {
+  useOCR,
+  useSummary,
   useFormData,
   useSession,
   MARYLAND_GRADES,
   MARYLAND_SUBJECTS,
-  REPORTING_PERIODS 
+  REPORTING_PERIODS,
 } from '../stores/appStore';
 
 function SummaryPage() {
@@ -56,7 +51,7 @@ function SummaryPage() {
   const [progress, setProgress] = useState(0);
   const [summaryText, setSummaryText] = useState('');
   const [copied, setCopied] = useState(false);
-  const { isOpen: isPrinting, onOpen: openPrint, onClose: closePrint } = useDisclosure();
+  const [_isPrinting, setIsPrinting] = useState(false);
   
   const { ocrResults } = useOCR();
   const { summary, addSummary, setSummaryState } = useSummary();
@@ -88,13 +83,13 @@ function SummaryPage() {
     setIsGenerating(true);
     setProgress(0);
     setSummaryState({ is_generating: true, error: null });
-    
+
+    // Simulate progress — declared outside try/catch so catch can clear it
+    const interval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 8, 88));
+    }, 200);
+
     try {
-      // Simulate progress
-      const interval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 8, 88));
-      }, 200);
-      
       const result = await API.summary.generate({
         text,
         template: 'maryland_qpr',
@@ -108,16 +103,16 @@ function SummaryPage() {
         include_iep_goals: formData.include_iep_goals,
         include_behavioral: formData.include_behavioral,
       }, sessionId || undefined);
-      
+
       clearInterval(interval);
       setProgress(100);
-      
+
       addSummary(result);
       setSummaryText(result.summary_text);
-      
+
       setSummaryState({ is_generating: false, error: null });
       setIsGenerating(false);
-      
+
       toast({
         title: 'Summary generated',
         description: `Report generated using ${result.model_used}`,
@@ -125,7 +120,7 @@ function SummaryPage() {
         duration: 3000,
         isClosable: true,
       });
-      
+
     } catch (error) {
       clearInterval(interval);
       setIsGenerating(false);
@@ -178,10 +173,10 @@ function SummaryPage() {
   
   // Print summary
   const handlePrint = () => {
-    openPrint();
+    setIsPrinting(true);
     setTimeout(() => {
       window.print();
-      closePrint();
+      setIsPrinting(false);
     }, 100);
   };
   
@@ -262,7 +257,7 @@ function SummaryPage() {
                 value={formData.grade_level} 
                 onChange={(e) => updateFormData({ grade_level: e.target.value })}
               >
-                {MARYLAND_GRADES.map(grade => (
+                {MARYLAND_GRADES.map((grade: string) => (
                   <option key={grade} value={grade}>{grade}</option>
                 ))}
               </Select>
@@ -273,7 +268,7 @@ function SummaryPage() {
                 value={formData.subject} 
                 onChange={(e) => updateFormData({ subject: e.target.value })}
               >
-                {MARYLAND_SUBJECTS.map(subject => (
+                {MARYLAND_SUBJECTS.map((subject: string) => (
                   <option key={subject} value={subject}>{subject}</option>
                 ))}
               </Select>
@@ -305,7 +300,7 @@ function SummaryPage() {
                 value={formData.reporting_period} 
                 onChange={(e) => updateFormData({ reporting_period: e.target.value })}
               >
-                {REPORTING_PERIODS.map(period => (
+                {REPORTING_PERIODS.map((period: string) => (
                   <option key={period} value={period}>{period}</option>
                 ))}
               </Select>
@@ -410,10 +405,10 @@ function SummaryPage() {
             </Flex>
           </CardHeader>
           <CardBody>
-            <Box 
+            <Box
               className="summary-output"
               whiteSpace="pre-wrap"
-              wordWrap="break-word"
+              overflowWrap="break-word"
               fontSize="md"
               lineHeight="1.7"
               p={4}
@@ -446,7 +441,7 @@ function SummaryPage() {
       </Flex>
       
       {/* Print Styles */}
-      <style jsx global>{`
+      <style>{`
         @media print {
           .no-print {
             display: none !important;

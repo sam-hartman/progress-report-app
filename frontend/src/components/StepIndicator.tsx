@@ -1,6 +1,4 @@
-"""
-Step indicator component showing the current workflow step
-"""
+// Step indicator component showing the current workflow step
 import { Box, Flex, Text } from '@chakra-ui/react';
 
 interface StepIndicatorProps {

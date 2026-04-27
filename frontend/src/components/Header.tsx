@@ -1,6 +1,4 @@
-"""
-Header component with app title and branding
-"""
+// Header component with app title and branding
 import { Box, Flex, Heading, Text, useColorModeValue } from '@chakra-ui/react';
 import { Link } from 'react-router-dom';
 

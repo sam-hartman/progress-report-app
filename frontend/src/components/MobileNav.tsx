@@ -1,6 +1,4 @@
-"""
-Mobile navigation component for bottom tab navigation
-"""
+// Mobile navigation component for bottom tab navigation
 import { Box, Button, Flex, Text } from '@chakra-ui/react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiUpload, FiFileText, FiTable, FiFile } from 'react-icons/fi';

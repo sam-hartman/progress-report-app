@@ -1,14 +1,12 @@
-"""
-Tables extraction and selection page
-"""
+// Tables extraction and selection page
 import { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Button, 
-  Flex, 
-  Heading, 
-  Text, 
-  VStack, 
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Text,
+  VStack,
   useToast,
   Spinner,
   Alert,
@@ -25,8 +23,6 @@ import {
   Th,
   Td,
   Checkbox,
-  Stack,
-  Icon,
   Badge
 } from '@chakra-ui/react';
 import { FiArrowLeft, FiArrowRight, FiTable, FiCheckSquare, FiSquare } from 'react-icons/fi';
@@ -39,7 +35,6 @@ function TablesPage() {
   const toast = useToast();
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionProgress, setExtractionProgress] = useState(0);
-  const [selectedText, setSelectedText] = useState('');
   
   const { ocrResults, ocr } = useOCR();
   const { 
@@ -76,24 +71,24 @@ function TablesPage() {
     
     setIsExtracting(true);
     setExtractionProgress(0);
-    
+
+    // Simulate progress — declared outside try/catch so catch can clear it
+    const interval = setInterval(() => {
+      setExtractionProgress(prev => Math.min(prev + 15, 85));
+    }, 150);
+
     try {
-      // Simulate progress
-      const interval = setInterval(() => {
-        setExtractionProgress(prev => Math.min(prev + 15, 85));
-      }, 150);
-      
       const result = await API.table.extract({
         text,
         min_confidence: 0.6,
       });
-      
+
       clearInterval(interval);
       setExtractionProgress(100);
-      
+
       setExtractedTables(result.tables);
       setIsExtracting(false);
-      
+
       toast({
         title: 'Tables extracted',
         description: `Found ${result.tables.length} table(s) in the text`,
@@ -101,7 +96,7 @@ function TablesPage() {
         duration: 3000,
         isClosable: true,
       });
-      
+
     } catch (error) {
       clearInterval(interval);
       setIsExtracting(false);
@@ -133,11 +128,6 @@ function TablesPage() {
   // Deselect all tables
   const deselectAllTables = () => {
     setSelectedTableIds([]);
-  };
-  
-  // Get selected tables
-  const getSelectedTables = () => {
-    return extractedTables.filter(table => selectedTableIds.includes(table.id));
   };
   
   // Continue to summary

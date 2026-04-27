@@ -21,7 +21,7 @@ import { useAppStore } from '../stores/appStore';
 const PRIVACY_BULLETS = [
   'Student names and information are encrypted in your browser',
   'Photos are sent to a secure server for text recognition, then deleted within 24 hours',
-  'Text is processed by Mistral AI with Zero Data Retention \u2014 they don\'t store or train on your data',
+  'Text is processed by an AI service with Zero Data Retention \u2014 your data is not stored or used for training',
   'Reports are saved in your browser for up to 90 days, then automatically removed',
 ] as const;
 

@@ -1,7 +1,7 @@
 // Zustand store for application state
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
+import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, ReportRecord, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
 
 export { MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS };
 
@@ -12,7 +12,8 @@ type AppData = Omit<AppState,
   'resetOCR' | 'setExtractedTables' | 'setSelectedTableIds' | 'toggleTableSelection' |
   'addSummary' | 'setCurrentSummaryId' | 'setSummaryState' | 'resetSummary' |
   'updateFormData' | 'setCurrentStep' | 'goToUpload' | 'goToOCR' | 'goToTables' |
-  'goToSummary' | 'setIsMobile' | 'setHasCameraAccess' | 'resetAll'
+  'goToSummary' | 'setIsMobile' | 'setHasCameraAccess' | 'addReportToHistory' |
+  'removeReportFromHistory' | 'clearHistory' | 'resetAll'
 >;
 
 const initialState: AppData = {
@@ -62,6 +63,9 @@ const initialState: AppData = {
     include_behavioral: true,
   },
   
+  // Report history
+  reportHistory: [],
+
   // UI state
   currentStep: 'upload',
   is_mobile: false,
@@ -160,7 +164,17 @@ export const useAppStore = create<AppState>()(
           currentSummaryId: initialState.currentSummaryId,
         }),
         
-        resetAll: () => set(initialState),
+        addReportToHistory: (report: ReportRecord) => set((state) => ({
+          reportHistory: [report, ...state.reportHistory].slice(0, 50),
+        })),
+
+        removeReportFromHistory: (reportId: string) => set((state) => ({
+          reportHistory: state.reportHistory.filter((r) => r.id !== reportId),
+        })),
+
+        clearHistory: () => set({ reportHistory: [] }),
+
+        resetAll: () => set({ ...initialState, reportHistory: _get().reportHistory }),
         
         // Navigation helpers
         goToUpload: () => set({ currentStep: 'upload' }),
@@ -171,9 +185,9 @@ export const useAppStore = create<AppState>()(
       {
         name: 'qpr-app-storage',
         partialize: (state) => ({
-          // Only persist these parts of state
           formData: state.formData,
           currentStep: state.currentStep,
+          reportHistory: state.reportHistory,
         }),
       }
     ),
@@ -241,6 +255,13 @@ export const useNavigation = () => useAppStore((state) => ({
   goToOCR: state.goToOCR,
   goToTables: state.goToTables,
   goToSummary: state.goToSummary,
+}));
+
+export const useReportHistory = () => useAppStore((state) => ({
+  reportHistory: state.reportHistory,
+  addReportToHistory: state.addReportToHistory,
+  removeReportFromHistory: state.removeReportFromHistory,
+  clearHistory: state.clearHistory,
 }));
 
 export const useUIState = () => useAppStore((state) => ({

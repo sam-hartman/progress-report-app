@@ -175,6 +175,9 @@ export interface AppState {
     include_behavioral: boolean;
   };
 
+  // Report history
+  reportHistory: ReportRecord[];
+
   // UI state
   currentStep: 'upload' | 'ocr' | 'tables' | 'summary';
   is_mobile: boolean;
@@ -207,7 +210,22 @@ export interface AppState {
   goToSummary: () => void;
   setIsMobile: (isMobile: boolean) => void;
   setHasCameraAccess: (hasAccess: boolean) => void;
+  addReportToHistory: (report: ReportRecord) => void;
+  removeReportFromHistory: (reportId: string) => void;
+  clearHistory: () => void;
   resetAll: () => void;
+}
+
+// Report history
+export interface ReportRecord {
+  id: string;
+  createdAt: string;
+  formData: AppState['formData'];
+  summaryText: string;
+  ocrTexts: { filename: string; text: string }[];
+  imageFilenames: string[];
+  modelUsed: string;
+  processingTime: number;
 }
 
 // Maryland-specific types

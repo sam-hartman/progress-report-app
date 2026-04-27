@@ -39,6 +39,9 @@ import {
   FiRefreshCw,
   FiChevronDown,
   FiChevronUp,
+  FiClock,
+  FiTrash2,
+  FiArrowLeft,
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -51,8 +54,10 @@ import {
   useSession,
   useFormData,
   useSummary,
+  useReportHistory,
 } from '../stores/appStore';
 import {
+  ReportRecord,
   MARYLAND_GRADES,
   MARYLAND_SUBJECTS,
   REPORTING_PERIODS,
@@ -67,12 +72,15 @@ function ReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [ocrPreviewTexts, setOcrPreviewTexts] = useState<{ filename: string; text: string }[]>([]);
   const [showOcrPreview, setShowOcrPreview] = useState(false);
+  const [viewingReport, setViewingReport] = useState<ReportRecord | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const { images, addImage, removeImage } = useImages();
   const { upload, setUploadState } = useUpload();
   const { sessionId } = useSession();
   const { formData, updateFormData } = useFormData();
   const { addSummary } = useSummary();
+  const { reportHistory, addReportToHistory, removeReportFromHistory } = useReportHistory();
 
   // Create session on mount
   useEffect(() => {
@@ -204,6 +212,17 @@ function ReportPage() {
       addSummary(result);
       setSummaryText(result.summary_text);
       setGenerationStatus('');
+
+      addReportToHistory({
+        id: `report_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        formData: { ...formData },
+        summaryText: result.summary_text,
+        ocrTexts: ocrPreviews,
+        imageFilenames: images.map((img) => img.filename),
+        modelUsed: result.model_used,
+        processingTime: result.processing_time,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Report generation failed';
       setError(message);
@@ -263,6 +282,7 @@ function ReportPage() {
     <Box maxW="960px" mx="auto" px={{ base: 4, md: 6 }} py={6}>
       <VStack spacing={5} align="stretch">
 
+        {!viewingReport && (<>
         {/* Upload */}
         <Card variant="outline">
           <CardBody>
@@ -567,6 +587,196 @@ function ReportPage() {
               New Report
             </Button>
           </Flex>
+        )}
+        </>)}
+
+        {/* Viewing a past report */}
+        {viewingReport && (
+          <>
+            <Flex align="center" mb={2}>
+              <Button
+                leftIcon={<FiArrowLeft />}
+                size="xs"
+                variant="ghost"
+                color="gray.500"
+                onClick={() => setViewingReport(null)}
+                _hover={{ color: 'brand.600' }}
+              >
+                Back
+              </Button>
+              <Text fontSize="xs" color="gray.400" ml={2}>
+                {new Date(viewingReport.createdAt).toLocaleDateString('en-US', {
+                  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                })}
+              </Text>
+            </Flex>
+
+            <Card variant="outline" mb={3}>
+              <CardBody py={3}>
+                <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600" mb={2}>
+                  Report Details
+                </Text>
+                <SimpleGrid columns={{ base: 2, md: 3 }} spacing={2} fontSize="xs" color="gray.600">
+                  {viewingReport.formData.student_name && (
+                    <Text><Text as="span" fontWeight={600}>Student:</Text> {viewingReport.formData.student_name}</Text>
+                  )}
+                  <Text><Text as="span" fontWeight={600}>Grade:</Text> {viewingReport.formData.grade_level}</Text>
+                  <Text><Text as="span" fontWeight={600}>Subject:</Text> {viewingReport.formData.subject}</Text>
+                  {viewingReport.formData.teacher_name && (
+                    <Text><Text as="span" fontWeight={600}>Teacher:</Text> {viewingReport.formData.teacher_name}</Text>
+                  )}
+                  {viewingReport.formData.school && (
+                    <Text><Text as="span" fontWeight={600}>School:</Text> {viewingReport.formData.school}</Text>
+                  )}
+                  <Text><Text as="span" fontWeight={600}>Period:</Text> {viewingReport.formData.reporting_period}</Text>
+                </SimpleGrid>
+                {viewingReport.imageFilenames.length > 0 && (
+                  <Text fontSize="xs" color="gray.400" mt={2}>
+                    Sources: {viewingReport.imageFilenames.join(', ')}
+                  </Text>
+                )}
+              </CardBody>
+            </Card>
+
+            {viewingReport.ocrTexts.length > 0 && (
+              <Card variant="outline" mb={3}>
+                <CardBody py={3}>
+                  <Flex
+                    justify="space-between"
+                    align="center"
+                    cursor="pointer"
+                    onClick={() => setShowOcrPreview(!showOcrPreview)}
+                    _hover={{ color: 'brand.600' }}
+                  >
+                    <HStack spacing={2}>
+                      <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
+                        Extracted Text
+                      </Text>
+                      <Badge colorScheme="blue" fontSize="2xs" variant="subtle">
+                        {viewingReport.ocrTexts.length} source{viewingReport.ocrTexts.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </HStack>
+                    <Icon as={showOcrPreview ? FiChevronUp : FiChevronDown} color="gray.400" boxSize={4} />
+                  </Flex>
+                  {showOcrPreview && (
+                    <VStack spacing={3} align="stretch" mt={3}>
+                      {viewingReport.ocrTexts.map((ocr, idx) => (
+                        <Box key={idx}>
+                          {viewingReport.ocrTexts.length > 1 && (
+                            <Text fontSize="xs" fontWeight={600} color="gray.500" mb={1}>{ocr.filename}</Text>
+                          )}
+                          <Box bg="gray.50" p={4} borderRadius="md" maxH="300px" overflowY="auto" fontSize="sm" border="1px solid" borderColor="gray.200" sx={markdownStyles}>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{ocr.text}</ReactMarkdown>
+                          </Box>
+                        </Box>
+                      ))}
+                    </VStack>
+                  )}
+                </CardBody>
+              </Card>
+            )}
+
+            <Card variant="outline">
+              <CardBody>
+                <Flex justify="space-between" align="center" mb={4} flexWrap="wrap" gap={2}>
+                  <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
+                    Progress Report
+                  </Text>
+                  <HStack spacing={1}>
+                    <Button
+                      leftIcon={<FiCopy />} size="xs" variant="ghost" color="gray.500"
+                      onClick={() => { navigator.clipboard.writeText(viewingReport.summaryText); }}
+                      _hover={{ color: 'brand.600' }}
+                    >
+                      Copy
+                    </Button>
+                    <Button leftIcon={<FiDownload />} size="xs" variant="ghost" color="gray.500"
+                      onClick={async () => {
+                        const fn = `progress_report_${viewingReport.formData.student_name || 'student'}_${Date.now()}.docx`;
+                        await downloadAsDocx(viewingReport.summaryText, fn);
+                      }}
+                      _hover={{ color: 'brand.600' }}
+                    >
+                      Word
+                    </Button>
+                  </HStack>
+                </Flex>
+                <Box className="report-output" p={5} borderRadius="md" border="1px solid" borderColor="gray.200" bg="white" fontSize="sm" sx={markdownStyles}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingReport.summaryText}</ReactMarkdown>
+                </Box>
+              </CardBody>
+            </Card>
+          </>
+        )}
+
+        {/* Report History */}
+        {reportHistory.length > 0 && !viewingReport && (
+          <Card variant="outline">
+            <CardBody py={3}>
+              <Flex
+                justify="space-between"
+                align="center"
+                cursor="pointer"
+                onClick={() => setShowHistory(!showHistory)}
+                _hover={{ color: 'brand.600' }}
+              >
+                <HStack spacing={2}>
+                  <Icon as={FiClock} color="gray.400" boxSize={4} />
+                  <Text fontSize="xs" fontWeight={700} textTransform="uppercase" letterSpacing="0.08em" color="brand.600">
+                    Past Reports
+                  </Text>
+                  <Badge colorScheme="gray" fontSize="2xs" variant="subtle">
+                    {reportHistory.length}
+                  </Badge>
+                </HStack>
+                <Icon as={showHistory ? FiChevronUp : FiChevronDown} color="gray.400" boxSize={4} />
+              </Flex>
+
+              {showHistory && (
+                <VStack spacing={2} align="stretch" mt={3}>
+                  {reportHistory.map((report) => (
+                    <Flex
+                      key={report.id}
+                      align="center"
+                      justify="space-between"
+                      p={3}
+                      bg="gray.50"
+                      borderRadius="md"
+                      border="1px solid"
+                      borderColor="gray.200"
+                      cursor="pointer"
+                      _hover={{ bg: 'gray.100', borderColor: 'brand.300' }}
+                      onClick={() => { setViewingReport(report); setShowOcrPreview(false); }}
+                    >
+                      <Box flex={1}>
+                        <Text fontSize="sm" fontWeight={600} color="gray.700" noOfLines={1}>
+                          {report.formData.student_name || 'Unnamed Student'}
+                          <Text as="span" fontWeight={400} color="gray.500">
+                            {' -- '}{report.formData.subject}, {report.formData.grade_level}
+                          </Text>
+                        </Text>
+                        <Text fontSize="xs" color="gray.400">
+                          {new Date(report.createdAt).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+                          })}
+                          {' -- '}{report.imageFilenames.length} image{report.imageFilenames.length !== 1 ? 's' : ''}
+                        </Text>
+                      </Box>
+                      <IconButton
+                        aria-label="Delete report"
+                        icon={<FiTrash2 />}
+                        size="xs"
+                        variant="ghost"
+                        color="gray.400"
+                        _hover={{ color: 'red.500' }}
+                        onClick={(e) => { e.stopPropagation(); removeReportFromHistory(report.id); }}
+                      />
+                    </Flex>
+                  ))}
+                </VStack>
+              )}
+            </CardBody>
+          </Card>
         )}
 
         <style>{`

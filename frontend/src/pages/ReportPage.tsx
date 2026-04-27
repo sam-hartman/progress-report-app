@@ -46,6 +46,7 @@ import {
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { downloadAsDocx } from '../utils/markdownToDocx';
 import { API } from '../utils/api';
 import {
   useAppStore,
@@ -290,19 +291,16 @@ function ReportPage() {
     setTimeout(() => window.print(), 100);
   };
 
-  // Download
-  const handleDownload = () => {
+  // Download as .docx
+  const handleDownload = async () => {
     if (!summaryText) return;
-    const blob = new Blob([summaryText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `progress_report_${formData.student_name || 'student'}_${Date.now()}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    toast({ title: 'Downloaded', status: 'success', duration: 2000, isClosable: true });
+    const filename = `progress_report_${formData.student_name || 'student'}_${Date.now()}.docx`;
+    try {
+      await downloadAsDocx(summaryText, filename);
+      toast({ title: 'Downloaded', description: 'Saved as Word document', status: 'success', duration: 2000, isClosable: true });
+    } catch {
+      toast({ title: 'Download failed', status: 'error', duration: 3000, isClosable: true });
+    }
   };
 
   // Start over

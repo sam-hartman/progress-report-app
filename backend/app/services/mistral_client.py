@@ -112,13 +112,13 @@ Preserve formatting, line breaks, and spacing.
 Return only the extracted text without any additional commentary."""
         
         payload = {
-            "model": self.ocr_model,
+            "model": "pixtral-large-latest",
             "messages": [
                 {
                     "role": "user",
                     "content": [
                         {"type": "text", "text": ocr_prompt},
-                        {"type": "image_url", "image_url": f"data:image/jpeg;base64,{image_b64}"}
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
                     ]
                 }
             ],

@@ -476,23 +476,18 @@ async def _perform_tesseract_ocr(image_path: Path, language: str = "eng"):
     start_time = time_module.time()
     
     try:
-        # Preprocess image for Tesseract
-        processed_path = ImageProcessor.preprocess_for_ocr(
-            image_path,
-            enhance_contrast=True,
-            remove_noise=True,
-            deskew=True
-        )
-        
-        # Perform OCR
+        # Open image with PIL and convert to RGB for Tesseract
+        from PIL import Image as PILImage
+        img = PILImage.open(image_path)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Perform OCR directly on the RGB image
         text = pytesseract.image_to_string(
-            processed_path,
+            img,
             lang=language,
             config="--psm 6"  # Assume a single uniform block of text
         )
-        
-        # Clean up
-        processed_path.unlink()
         
         processing_time = time_module.time() - start_time
         

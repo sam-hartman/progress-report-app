@@ -80,13 +80,13 @@ class ImageResponse(BaseModel):
 
 class OCRResultResponse(BaseModel):
     """Response schema for OCR result"""
-    image_id: UUID
+    image_id: Optional[UUID] = None
     text: str
     confidence: float
     processing_time: float
     status: OCRStatus = OCRStatus.COMPLETE
     model_used: str
-    completed_at: datetime
+    completed_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -97,15 +97,15 @@ class TableData(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     headers: List[str]
     rows: List[List[str]]
-    confidence: float
+    confidence: float = 0.9
     bounding_box: Optional[Dict[str, Any]] = None
 
 
 class ExtractTablesResponse(BaseModel):
     """Response schema for table extraction"""
-    text_hash: str
+    text_hash: Optional[str] = None
     tables: List[TableData]
-    processing_time: float
+    processing_time: float = 0.0
 
 
 class StructuredSummary(BaseModel):
@@ -142,10 +142,10 @@ class StructuredSummary(BaseModel):
 class GenerateSummaryResponse(BaseModel):
     """Response schema for summary generation"""
     summary_text: str
-    structured_data: StructuredSummary
-    processing_time: float
-    model_used: str
-    completed_at: datetime
+    structured_data: Optional[StructuredSummary] = None
+    processing_time: float = 0.0
+    model_used: str = ""
+    completed_at: Optional[datetime] = None
 
 
 class SessionResponse(BaseModel):

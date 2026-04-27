@@ -40,6 +40,9 @@ import {
   FiPrinter,
   FiDownload,
   FiRefreshCw,
+  FiEye,
+  FiChevronDown,
+  FiChevronUp,
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -65,6 +68,8 @@ function ReportPage() {
   const [summaryText, setSummaryText] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ocrPreviewTexts, setOcrPreviewTexts] = useState<{ filename: string; text: string }[]>([]);
+  const [showOcrPreview, setShowOcrPreview] = useState(true);
 
   const { images, addImage, removeImage } = useImages();
   const { upload, setUploadState } = useUpload();
@@ -213,13 +218,16 @@ function ReportPage() {
     setIsGenerating(true);
     setError(null);
     setSummaryText('');
+    setOcrPreviewTexts([]);
 
     try {
       // Step 1: OCR each image
       setGenerationStatus(`Reading text from ${images.length} image${images.length > 1 ? 's' : ''}...`);
       const ocrTexts: string[] = [];
+      const ocrPreviews: { filename: string; text: string }[] = [];
 
       for (const image of images) {
+        setGenerationStatus(`Reading ${image.filename}...`);
         const result = await API.ocr.process({
           image_id: image.image_id,
           language: 'eng',
@@ -227,8 +235,11 @@ function ReportPage() {
           use_mistral: true,
         }, sessionId || undefined);
         ocrTexts.push(result.text);
+        ocrPreviews.push({ filename: image.filename, text: result.text });
       }
 
+      setOcrPreviewTexts(ocrPreviews);
+      setShowOcrPreview(true);
       const combinedText = ocrTexts.join('\n\n---\n\n');
 
       // Step 2: Generate summary from combined OCR text
@@ -298,6 +309,7 @@ function ReportPage() {
   const handleStartOver = () => {
     useAppStore.getState().resetAll();
     setSummaryText('');
+    setOcrPreviewTexts([]);
     setError(null);
     setGenerationStatus('');
   };
@@ -537,6 +549,60 @@ function ReportPage() {
             <AlertDescription>{error}</AlertDescription>
           </Box>
         </Alert>
+      )}
+
+      {/* OCR Preview */}
+      {ocrPreviewTexts.length > 0 && (
+        <Card>
+          <CardHeader
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            cursor="pointer"
+            onClick={() => setShowOcrPreview(!showOcrPreview)}
+            _hover={{ bg: 'gray.50' }}
+            borderRadius="md"
+          >
+            <Flex align="center" gap={2}>
+              <Icon as={FiEye} />
+              <Heading as="h3" size="md">OCR Preview — Extracted Text</Heading>
+              <Text fontSize="sm" color="gray.500">
+                ({ocrPreviewTexts.length} image{ocrPreviewTexts.length > 1 ? 's' : ''})
+              </Text>
+            </Flex>
+            <Icon as={showOcrPreview ? FiChevronUp : FiChevronDown} />
+          </CardHeader>
+          {showOcrPreview && (
+            <CardBody pt={0}>
+              <VStack spacing={4} align="stretch">
+                {ocrPreviewTexts.map((ocr, idx) => (
+                  <Box key={idx}>
+                    {ocrPreviewTexts.length > 1 && (
+                      <Text fontSize="sm" fontWeight="bold" color="blue.600" mb={1}>
+                        {ocr.filename}
+                      </Text>
+                    )}
+                    <Box
+                      bg="gray.50"
+                      p={4}
+                      borderRadius="md"
+                      maxH="400px"
+                      overflowY="auto"
+                      fontSize="sm"
+                      fontFamily="mono"
+                      whiteSpace="pre-wrap"
+                      overflowWrap="break-word"
+                      border="1px solid"
+                      borderColor="gray.200"
+                    >
+                      {ocr.text}
+                    </Box>
+                  </Box>
+                ))}
+              </VStack>
+            </CardBody>
+          )}
+        </Card>
       )}
 
       {/* Report Output */}

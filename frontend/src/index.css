@@ -54,15 +54,21 @@ body {
   background: #a0aec0;
 }
 
-/* Hide browser autofill icons (contact/person avatars) */
+/* Hide Safari autofill contact/person icons */
 input::-webkit-contacts-auto-fill-button,
-input::-webkit-credentials-auto-fill-button {
-  visibility: hidden;
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-caps-lock-indicator,
+input::-webkit-textfield-decoration-container {
+  visibility: hidden !important;
   display: none !important;
-  pointer-events: none;
-  height: 0;
-  width: 0;
-  margin: 0;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: -9999px !important;
+  height: 0 !important;
+  width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
 }
 
 /* Print */

@@ -299,6 +299,9 @@ function ReportPage() {
         case_manager: formData.case_manager || undefined,
         school: formData.school || undefined,
         reporting_period: formData.reporting_period,
+        native_language: formData.report_type === 'iep_progress_monitoring'
+          ? formData.native_language || 'English'
+          : undefined,
         image_ids: formData.report_type === 'iep_progress_monitoring'
           ? images.map((img) => img.image_id)
           : undefined,
@@ -660,6 +663,15 @@ function ReportPage() {
                   {REPORTING_PERIODS.map((p: string) => <option key={p} value={p}>{p}</option>)}
                 </Select>
               </FormControl>
+              {formData.report_type === 'iep_progress_monitoring' && (
+                <FormControl>
+                  <FormLabel fontSize="xs" color="gray.600" fontWeight={600} mb={1}>Native Language</FormLabel>
+                  <Select size="sm" borderColor="gray.300" value={formData.native_language} onChange={(e) => updateFormData({ native_language: e.target.value })}>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish (include translation)</option>
+                  </Select>
+                </FormControl>
+              )}
             </Stack>
 
             <Divider my={3} borderColor="gray.200" />

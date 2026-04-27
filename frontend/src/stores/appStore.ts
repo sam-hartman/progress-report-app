@@ -71,6 +71,7 @@ const initialState: AppData = {
     case_manager: '',
     teacher_name: '',
     school: '',
+    native_language: 'English',
     reporting_period: REPORTING_PERIODS[0], // Default to Q1
     include_standards: true,
     include_iep_goals: true,

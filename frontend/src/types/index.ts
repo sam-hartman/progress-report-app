@@ -116,6 +116,7 @@ export interface GenerateSummaryRequest {
   case_manager?: string;
   school?: string;
   reporting_period?: string;
+  native_language?: string;
   custom_prompt?: string;
   image_ids?: string[];
   include_standards?: boolean;
@@ -174,6 +175,7 @@ export interface AppState {
     case_manager: string;
     teacher_name: string;
     school: string;
+    native_language: string;
     reporting_period: string;
     include_standards: boolean;
     include_iep_goals: boolean;

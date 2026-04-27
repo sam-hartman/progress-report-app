@@ -586,6 +586,7 @@ async def generate_summary(
             case_manager=request.case_manager,
             school=request.school,
             reporting_period=request.reporting_period,
+            native_language=request.native_language,
             include_standards=request.include_standards,
             include_iep_goals=request.include_iep_goals,
             include_behavioral=request.include_behavioral,

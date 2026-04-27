@@ -227,6 +227,7 @@ Text to analyze:
         case_manager: Optional[str] = None,
         school: Optional[str] = None,
         reporting_period: Optional[str] = None,
+        native_language: Optional[str] = None,
         include_standards: bool = True,
         include_iep_goals: bool = False,
         include_behavioral: bool = True,
@@ -257,6 +258,7 @@ Text to analyze:
                 reporting_period=reporting_period,
                 include_behavioral=include_behavioral,
                 has_images=bool(image_paths),
+                native_language=native_language,
             )
         else:
             prompt = self._build_summary_prompt(
@@ -453,34 +455,28 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
         reporting_period: Optional[str],
         include_behavioral: bool,
         has_images: bool = False,
+        native_language: Optional[str] = None,
     ) -> str:
-        """Build the IEP Progress Monitoring prompt (Goalbook format)"""
+        """Build the IEP Progress Monitoring prompt matching Maryland State IEP format."""
+
+        needs_spanish = native_language and native_language.lower() == "spanish"
+        student = student_name or "the student"
 
         prompt_parts = [
-            "You are an experienced special education teacher and IEP case manager in Maryland public schools.",
-            "You have deep expertise in writing IEP progress monitoring reports using the Goalbook data collection format.",
+            "You are a Maryland special education teacher writing IEP quarterly progress report entries.",
+            "You generate ONLY the 'Description of Progress' field for the Maryland State IEP form (Section IV. Goals).",
             "",
         ]
 
         if has_images:
             prompt_parts.extend([
-                "You have been provided with BOTH the original photos of the IEP data collection sheets AND the OCR-extracted text below.",
-                "IMPORTANT: Use the original images as your primary source of truth. The OCR text may contain errors, especially for:",
-                "- Handwritten numbers and dates",
-                "- Checkmarks, X marks, and tally marks",
-                "- Abbreviations and teacher shorthand",
-                "- Data in small grid cells",
-                "When the OCR text is ambiguous or unclear, refer to the original images to verify the data.",
+                "You have been provided with BOTH the original photos of the data collection sheets AND OCR-extracted text.",
+                "Use the original images as your primary source of truth. The OCR text may contain errors with handwritten numbers, checkmarks, and abbreviations.",
                 "",
             ])
 
-        prompt_parts.append(
-            "Analyze the following extracted data from IEP progress monitoring data collection sheets and write a comprehensive IEP quarterly progress report.",
-        )
-            "",
-            "Student Information:",
-        ]
-
+        # Student info
+        prompt_parts.append("Student Information:")
         if student_name:
             prompt_parts.append(f"- Student Name: {student_name}")
         if grade_level:
@@ -493,72 +489,102 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
             prompt_parts.append(f"- School: {school}")
         if reporting_period:
             prompt_parts.append(f"- Reporting Period: {reporting_period}")
+        if native_language:
+            prompt_parts.append(f"- Native Language: {native_language}")
 
         prompt_parts.extend([
             "",
-            "Extracted Data from IEP Progress Monitoring Sheets:",
+            "Extracted Data from Progress Monitoring Sheets:",
             "---",
             text,
             "---",
             "",
-            "IMPORTANT: The data above comes from Goalbook-style IEP progress monitoring sheets.",
-            "Each sheet typically contains:",
-            "- An Annual Learning Target (the overarching IEP goal)",
-            "- Numbered Objectives (specific measurable benchmarks within the goal)",
-            "- Data collection tables with dates, scores/percentages, strategies used, and notes",
-            "- Determination checkboxes: Met / Partially Met / Not Met for each objective",
+            "YOUR OUTPUT FORMAT",
             "",
-            "Generate an IEP Quarterly Progress Monitoring Report with the following structure:",
+            "For EACH goal found in the data, produce:",
+            "1. A Progress Code (select exactly one)",
+            "2. A Description of Progress (one sentence per objective)",
             "",
-            "## IEP PROGRESS MONITORING REPORT",
+            "PROGRESS CODES (select exactly one per goal):",
+            '- "Making sufficient progress to meet goal"',
+            '- "Not making sufficient progress to meet the goal"',
+            '- "Newly introduced skill: progress not measurable at this time"',
+            '- "Not Yet Introduced"',
+            '- "Achieved"',
             "",
-            "Include a header with student name, grade, goal area, case manager, school, and reporting period.",
+            "Selection logic:",
+            "- Most objectives at or trending toward criteria: Making sufficient progress",
+            "- Most objectives significantly below criteria with no improvement: Not making sufficient progress",
+            "- First reporting period, no data collected: Newly introduced skill",
+            "- Goal not yet introduced to instruction: Not Yet Introduced",
+            "- All criteria met consistently: Achieved",
             "",
-            "For EACH goal found in the data, create a section with:",
+            "DESCRIPTION OF PROGRESS FORMAT",
             "",
-            "### GOAL: [Goal Title from the data]",
+            "Write ONE sentence per objective using this pattern:",
+            f'"Objective [N]: {student} [is able to / can] [skill] [with/in] [X]% accuracy [in X out of Y trials]."',
             "",
-            "**Annual Learning Target:** [Copy the annual learning target exactly as written]",
+            "Rules:",
+            "- ONE sentence per objective, maximum",
+            "- ALWAYS include the accuracy percentage or frequency count from the data",
+            "- ALWAYS reference the skill described in the objective",
+            "- Use third person, present tense",
+            f'- When an objective was not addressed: "Objective [N]: This objective has not been addressed this quarter."',
+            f'- When an objective will be addressed later: "Objective [N]: This objective will be worked on this quarter."',
             "",
-            "Then for each objective under that goal:",
+            "EXAMPLES OF CORRECT OUTPUT",
             "",
-            "**Objective [number]: [objective description]**",
-            "- **Current Data:** [Most recent data point with date, score/percentage]",
-            "- **Trend:** [Improving / Maintaining / Declining — based on data point progression]",
-            "- **Status:** [Met / Partially Met / Not Met — based on criteria in the objective and data]",
-            "- **Evidence:** [Specific data points, scores, or observations from the sheets]",
+            "Example 1 - Reading Decoding:",
+            "Progress Code: Making sufficient progress to meet goal",
+            "Description of Progress: Objective 1: Keilan is able to read CVC words with digraphs with 100% accuracy. Objective 2: Keilan is able to read one syllable words with blends and short vowel sounds with 90% accuracy. Objective 3: Keilan is able to read 75% of Dolch Pre-Primer sight words.",
             "",
-            "After all objectives for a goal, include:",
+            "Example 2 - Learning Behaviors:",
+            "Progress Code: Making sufficient progress to meet goal",
+            "Description of Progress: Objective 1: This quarter Tristan began tasks within 2-3 minutes, given no more than 3 verbal prompts in 55% of opportunities. Objective 2: This quarter Tristan remained on task for at least 10 minutes given no more than 3 verbal prompts in 31% of opportunities. Objective 3: This quarter Tristan completed tasks within a given timeframe in 40% of opportunities.",
             "",
-            "**Overall Goal Progress:** [Summary of progress toward the annual learning target]",
-            "**Strategies Used:** [List strategies/accommodations noted in the data]",
-            "**Recommendations:** [Next steps, adjustments to instruction, or changes to consider]",
+            "Example 3 - Written Expression:",
+            "Progress Code: Making sufficient progress to meet goal",
+            "Description of Progress: Objective 1: With small group instruction, prompting, lines drawn for each word, sentence frames, and the text to refer to, Randy is able to write a one sentence response to the question using evidence from the text. Objective 2: Randy recently completed a story map to organize his ideas before writing a book report.",
             "",
         ])
 
-        if include_behavioral:
+        if needs_spanish:
             prompt_parts.extend([
-                "If the data includes a Learning Behavior or Behavioral goal, report on:",
-                "- Task completion rates and trends",
-                "- Number of prompts needed (and trend over time)",
-                "- Specific behavioral observations noted in the data",
-                "- Whether resistance/avoidance has increased or decreased",
+                "SPANISH TRANSLATION REQUIRED",
+                "",
+                f"Because {student}'s native language is Spanish, generate the Spanish translation immediately after the English text.",
+                "Translate each objective individually.",
+                "",
+                "Translation rules:",
+                '- "accuracy" = "precisión"',
+                '- "[X]% accuracy" = "un [X] % de precisión" (space before %)',
+                '- "This objective has not been addressed this quarter" = "Este objetivo no se ha abordado este trimestre"',
+                "- Keep proper nouns (Dolch Pre-Primer, CVC) in English",
+                "- Keep student names unchanged",
+                "- Use formal Spanish register",
+                "",
+                "Example with Spanish:",
+                "Description of Progress: Objective 1: Randy is able to read CVC words with 57% accuracy. Objective 2: This objective has not been addressed this quarter.",
+                "",
+                "Objetivo 1: Randy puede leer palabras CVC con un 57 % de precisión. Objetivo 2: Este objetivo no se ha abordado este trimestre.",
                 "",
             ])
 
         prompt_parts.extend([
-            "Formatting Requirements:",
-            "- Write in a professional, objective tone appropriate for IEP documentation",
-            "- Use the student's actual name throughout the report",
-            "- Reference specific data points, dates, scores, and percentages from the extracted data",
-            "- For each objective, clearly state Met / Partially Met / Not Met based on the criteria",
-            "- If data is insufficient to make a determination, state 'Insufficient Data' and explain",
-            "- Use markdown formatting with headers (##, ###), bold (**), and bullet points",
-            "- Do NOT use any emojis, emoticons, or Unicode icons anywhere in the report",
-            "- Do NOT fabricate data — only reference information found in the extracted text",
-            "- If multiple goal areas are present in the data, create separate sections for each",
+            "WHAT YOU MUST NEVER DO",
+            "- Do NOT write multiple paragraphs or lengthy analysis",
+            "- Do NOT include recommendations, strategies, next steps, or suggestions",
+            "- Do NOT include encouragement or praise",
+            "- Do NOT describe teaching methods or instructional approaches",
+            "- Do NOT list session-by-session logs or specific trial dates",
+            "- Do NOT analyze why the student is performing at a certain level",
+            "- Do NOT compare the student to peers or grade-level expectations",
+            "- Do NOT sign with credentials or include a provider name",
+            "- Do NOT exceed 120 words per goal (English) or 240 words (English + Spanish)",
+            "- Do NOT fabricate data -- only reference information found in the extracted text",
             "",
-            "Return the report as a well-formatted markdown document.",
+            "If multiple goal areas are present in the data, create separate sections for each.",
+            "Format the output as markdown with ## headers for each goal area.",
         ])
 
         return "\n".join(prompt_parts)

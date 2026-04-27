@@ -5,6 +5,10 @@
   "alias": ["progress-report-app-md.vercel.app"],
   "rewrites": [
     {
+      "source": "/api/auth",
+      "destination": "/api/auth"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://qpr-backend.fly.dev/api/:path*"
     }

@@ -588,14 +588,24 @@ function ReportPage() {
                       borderRadius="md"
                       maxH="400px"
                       overflowY="auto"
+                      overflowX="auto"
                       fontSize="sm"
-                      fontFamily="mono"
-                      whiteSpace="pre-wrap"
-                      overflowWrap="break-word"
                       border="1px solid"
                       borderColor="gray.200"
+                      sx={{
+                        'table': { width: '100%', borderCollapse: 'collapse', my: 3 },
+                        'th, td': { border: '1px solid', borderColor: 'gray.300', px: 3, py: 2, textAlign: 'left' },
+                        'th': { bg: 'blue.600', color: 'white', fontWeight: 'bold' },
+                        'tr:nth-of-type(even)': { bg: 'gray.100' },
+                        'h1, h2, h3, h4': { mt: 3, mb: 1, fontWeight: 'bold' },
+                        'h1': { fontSize: 'lg' },
+                        'h2': { fontSize: 'md' },
+                        'p': { my: 1 },
+                        'ul, ol': { pl: 5, my: 1 },
+                        'strong': { fontWeight: 'bold' },
+                      }}
                     >
-                      {ocr.text}
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{ocr.text}</ReactMarkdown>
                     </Box>
                   </Box>
                 ))}

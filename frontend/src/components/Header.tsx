@@ -32,17 +32,6 @@ function Header() {
         </Heading>
         <Text fontSize="md" opacity={0.9}>
           Maryland Public School System
-          <Box 
-            as="span" 
-            bg={textColor + '20'}
-            px={2} 
-            py={1} 
-            borderRadius="md"
-            ml={2}
-            fontSize="xs"
-          >
-            Powered by Mistral AI
-          </Box>
         </Text>
       </Flex>
     </Box>

@@ -238,17 +238,11 @@ function OCRPage() {
               Enhance image for better OCR results
             </Checkbox>
             
-            <Checkbox 
-              isChecked={useMistral} 
+            <Checkbox
+              isChecked={useMistral}
               onChange={(e) => setUseMistral(e.target.checked)}
-              isDisabled={!import.meta.env.VITE_MISTRAL_API_KEY}
             >
-              Use Mistral AI for OCR (more accurate)
-              {!import.meta.env.VITE_MISTRAL_API_KEY && (
-                <Text fontSize="xs" color="gray.500" ml={2}>
-                  (Mistral API key not configured)
-                </Text>
-              )}
+              Use AI-powered OCR (more accurate)
             </Checkbox>
           </Stack>
         </CardBody>

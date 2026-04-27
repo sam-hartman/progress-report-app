@@ -4,31 +4,55 @@ import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import App from './App';
 import './index.css';
 
-// Extend Chakra theme for Maryland school colors
 const theme = extendTheme({
   colors: {
     brand: {
-      50: '#e6f4ff',
-      100: '#cce7ff',
-      200: '#99ceff',
-      300: '#66b5ff',
-      400: '#339cff',
-      500: '#0084ff',
-      600: '#006acc',
-      700: '#005099',
-      800: '#003566',
-      900: '#001b33',
+      50: '#f0f4f8',
+      100: '#d9e2ec',
+      200: '#bcccdc',
+      300: '#9fb3c8',
+      400: '#829ab1',
+      500: '#627d98',
+      600: '#486581',
+      700: '#334e68',
+      800: '#243b53',
+      900: '#102a43',
     },
     maryland: {
-      blue: '#0066cc',
-      red: '#cc0000',
-      gold: '#ffcc00',
+      blue: '#003865',
+      navy: '#002244',
+      red: '#b31b1b',
+      gold: '#c99700',
       white: '#ffffff',
     },
   },
   fonts: {
-    body: 'Inter, system-ui, sans-serif',
-    heading: 'Inter, system-ui, sans-serif',
+    body: '"Source Sans Pro", "Inter", system-ui, sans-serif',
+    heading: '"Source Sans Pro", "Inter", system-ui, sans-serif',
+  },
+  components: {
+    Card: {
+      baseStyle: {
+        container: {
+          boxShadow: 'sm',
+          borderRadius: 'md',
+          border: '1px solid',
+          borderColor: 'gray.200',
+        },
+      },
+    },
+    Button: {
+      baseStyle: {
+        fontWeight: 600,
+        borderRadius: 'md',
+      },
+    },
+    Heading: {
+      baseStyle: {
+        color: 'gray.800',
+        letterSpacing: '-0.01em',
+      },
+    },
   },
   config: {
     initialColorMode: 'light',

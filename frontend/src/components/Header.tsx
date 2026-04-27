@@ -1,35 +1,35 @@
-// Header component with app title
-import { Box, Flex, Heading, Text, useColorModeValue } from '@chakra-ui/react';
+// Header component
+import { Box, Flex, Heading, Text } from '@chakra-ui/react';
 
 function Header() {
-  const bgColor = useColorModeValue('maryland.blue', 'gray.800');
-  const textColor = useColorModeValue('white', 'whiteAlpha.900');
-
   return (
     <Box
       as="header"
-      className="maryland-header"
-      bg={bgColor}
-      color={textColor}
+      className="maryland-header no-print"
+      bg="maryland.navy"
+      color="white"
       position="sticky"
       top={0}
       zIndex={100}
+      borderBottom="3px solid"
+      borderColor="maryland.gold"
     >
       <Flex
-        direction="column"
         align="center"
-        justify="center"
-        maxW="1200px"
+        justify="space-between"
+        maxW="960px"
         mx="auto"
-        px={4}
-        py={4}
+        px={6}
+        py={3}
       >
-        <Heading as="h1" size="xl" fontWeight={700}>
-          Quarterly Progress Report Notes
-        </Heading>
-        <Text fontSize="md" opacity={0.9}>
-          Maryland Public School System
-        </Text>
+        <Box>
+          <Heading as="h1" size="md" fontWeight={700} letterSpacing="-0.02em" color="white">
+            Quarterly Progress Report
+          </Heading>
+          <Text fontSize="xs" opacity={0.7} fontWeight={500} textTransform="uppercase" letterSpacing="0.05em">
+            Maryland Public School System
+          </Text>
+        </Box>
       </Flex>
     </Box>
   );

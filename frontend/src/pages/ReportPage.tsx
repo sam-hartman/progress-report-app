@@ -438,7 +438,7 @@ function ReportPage() {
               _hover={{ borderColor: 'brand.400', bg: 'gray.100' }}
               mb={3}
             >
-              <input {...getInputProps()} />
+              <input {...getInputProps()} style={{ display: 'none' }} />
               <Icon as={FiUpload} boxSize={6} color="gray.400" mb={2} />
               <Text fontSize="sm" color="gray.600" mb={1}>
                 {isDragActive ? 'Drop your files here' : 'Drag and drop images here, or'}

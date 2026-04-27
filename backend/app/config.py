@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         env="MISTRAL_OCR_MODEL"
     )
     mistral_llm_model: str = Field(
-        default="mistral-large-latest",
+        default="mistral-medium-latest",
         env="MISTRAL_LLM_MODEL"
     )
     

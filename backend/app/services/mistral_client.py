@@ -90,62 +90,47 @@ class MistralClient:
         image_path: Path,
         language: str = "eng"
     ) -> OCRResultResponse:
-        """
-        Perform OCR on an image using Mistral's vision model
-        
-        Note: As of current Mistral API, OCR might need to be done via
-        the chat completion endpoint with image support
-        """
+        """Perform OCR using Mistral's dedicated OCR endpoint (/v1/ocr)"""
         import time as time_module
-        
+
         start_time = time_module.time()
-        
-        # Read image and encode as base64
+
         with open(image_path, "rb") as f:
             image_data = f.read()
-        
+
         image_b64 = base64.b64encode(image_data).decode("utf-8")
-        
-        # Mistral OCR prompt
-        ocr_prompt = """Extract all text from this image exactly as it appears. 
-Preserve formatting, line breaks, and spacing. 
-Return only the extracted text without any additional commentary."""
-        
+
+        # Detect mime type from extension
+        suffix = image_path.suffix.lower()
+        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
+            suffix.lstrip("."), "image/png"
+        )
+
         payload = {
-            "model": "pixtral-large-latest",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": ocr_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}}
-                    ]
-                }
-            ],
-            "max_tokens": 4096,
-            "temperature": 0.0
+            "model": self.ocr_model,
+            "document": {
+                "type": "image_url",
+                "image_url": f"data:{mime};base64,{image_b64}"
+            }
         }
-        
+
         try:
-            result = await self._make_request("POST", "chat/completions", payload)
-            
-            # Extract text from response
-            text = result["choices"][0]["message"]["content"]
-            
-            # Calculate confidence (Mistral doesn't provide this directly)
-            # We'll use a placeholder or estimate based on response
-            confidence = 0.95  # Placeholder - Mistral vision is generally high confidence
-            
+            result = await self._make_request("POST", "ocr", payload)
+
+            # OCR response has pages[].markdown
+            pages = result.get("pages", [])
+            text = "\n\n".join(page.get("markdown", "") for page in pages)
+
             processing_time = time_module.time() - start_time
-            
+
             return OCRResultResponse(
-                image_id=None,  # Will be set by caller
+                image_id=None,
                 text=text,
-                confidence=confidence,
+                confidence=0.95,
                 processing_time=processing_time,
                 model_used=self.ocr_model
             )
-            
+
         except Exception as e:
             logger.error(f"Mistral OCR failed: {str(e)}")
             raise

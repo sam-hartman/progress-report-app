@@ -79,6 +79,14 @@ import { logEvent } from '../utils/auditLog';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const TIMEOUT_CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
 
+/** Strip markdown code fences that LLMs sometimes wrap responses in */
+function stripCodeFences(text: string): string {
+  const trimmed = text.trim();
+  // Match ```markdown ... ``` or ``` ... ```
+  const fenceMatch = trimmed.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```\s*$/);
+  return fenceMatch ? fenceMatch[1] : trimmed;
+}
+
 function ReportPage() {
   const toast = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -296,7 +304,7 @@ function ReportPage() {
       }, sessionId || undefined);
 
       addSummary(result);
-      setSummaryText(result.summary_text);
+      setSummaryText(stripCodeFences(result.summary_text));
       setGenerationStatus('');
 
       const reportId = `report_${Date.now()}`;
@@ -304,7 +312,7 @@ function ReportPage() {
         id: reportId,
         createdAt: new Date().toISOString(),
         formData: { ...formData },
-        summaryText: result.summary_text,
+        summaryText: stripCodeFences(result.summary_text),
         ocrTexts: ocrPreviews,
         imageFilenames: images.map((img) => img.filename),
         modelUsed: result.model_used,
@@ -438,7 +446,7 @@ function ReportPage() {
               _hover={{ borderColor: 'brand.400', bg: 'gray.100' }}
               mb={3}
             >
-              <input {...getInputProps()} style={{ display: 'none' }} />
+              <input {...getInputProps()} style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }} />
               <Icon as={FiUpload} boxSize={6} color="gray.400" mb={2} />
               <Text fontSize="sm" color="gray.600" mb={1}>
                 {isDragActive ? 'Drop your files here' : 'Drag and drop images here, or'}
@@ -948,7 +956,7 @@ function ReportPage() {
                   </Button>
                 </Flex>
                 <Box className="report-output" p={5} borderRadius="md" border="1px solid" borderColor="gray.200" bg="white" fontSize="sm" sx={markdownStyles}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{viewingReport.summaryText}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripCodeFences(viewingReport.summaryText)}</ReactMarkdown>
                 </Box>
               </CardBody>
             </Card>

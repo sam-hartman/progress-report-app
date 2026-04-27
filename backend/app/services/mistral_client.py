@@ -229,7 +229,8 @@ Text to analyze:
         reporting_period: Optional[str] = None,
         include_standards: bool = True,
         include_iep_goals: bool = False,
-        include_behavioral: bool = True
+        include_behavioral: bool = True,
+        image_paths: Optional[List[Path]] = None,
     ) -> GenerateSummaryResponse:
         """
         Generate a structured summary from extracted text.
@@ -255,6 +256,7 @@ Text to analyze:
                 school=school,
                 reporting_period=reporting_period,
                 include_behavioral=include_behavioral,
+                has_images=bool(image_paths),
             )
         else:
             prompt = self._build_summary_prompt(
@@ -271,15 +273,29 @@ Text to analyze:
                 include_behavioral=include_behavioral,
             )
 
+        # Build message content — multimodal if images provided
+        if image_paths:
+            content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}]
+            for img_path in image_paths:
+                try:
+                    with open(img_path, "rb") as f:
+                        img_b64 = base64.b64encode(f.read()).decode("utf-8")
+                    suffix = img_path.suffix.lower().lstrip(".")
+                    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(suffix, "image/jpeg")
+                    content.append({
+                        "type": "image_url",
+                        "image_url": f"data:{mime};base64,{img_b64}",
+                    })
+                except Exception:
+                    pass  # Skip unreadable images
+            messages = [{"role": "user", "content": content}]
+        else:
+            messages = [{"role": "user", "content": prompt}]
+
         payload = {
             "model": self.llm_model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": 4096,
+            "messages": messages,
+            "max_tokens": 8192,
             "temperature": 0.3
         }
 
@@ -436,6 +452,7 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
         school: Optional[str],
         reporting_period: Optional[str],
         include_behavioral: bool,
+        has_images: bool = False,
     ) -> str:
         """Build the IEP Progress Monitoring prompt (Goalbook format)"""
 
@@ -443,7 +460,23 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
             "You are an experienced special education teacher and IEP case manager in Maryland public schools.",
             "You have deep expertise in writing IEP progress monitoring reports using the Goalbook data collection format.",
             "",
+        ]
+
+        if has_images:
+            prompt_parts.extend([
+                "You have been provided with BOTH the original photos of the IEP data collection sheets AND the OCR-extracted text below.",
+                "IMPORTANT: Use the original images as your primary source of truth. The OCR text may contain errors, especially for:",
+                "- Handwritten numbers and dates",
+                "- Checkmarks, X marks, and tally marks",
+                "- Abbreviations and teacher shorthand",
+                "- Data in small grid cells",
+                "When the OCR text is ambiguous or unclear, refer to the original images to verify the data.",
+                "",
+            ])
+
+        prompt_parts.append(
             "Analyze the following extracted data from IEP progress monitoring data collection sheets and write a comprehensive IEP quarterly progress report.",
+        )
             "",
             "Student Information:",
         ]

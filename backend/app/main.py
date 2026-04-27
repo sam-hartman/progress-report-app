@@ -564,6 +564,16 @@ async def generate_summary(
     # Resolve session from headers or query param
     resolved_session = _resolve_session(http_request, session_id)
 
+    # Load original images for vision-augmented generation (IEP mode)
+    image_paths: list[Path] = []
+    if request.image_ids and request.report_type == "iep_progress_monitoring":
+        for img_id in request.image_ids:
+            # Find uploaded image file by UUID prefix
+            upload_dir = Path(settings.upload_dir)
+            matches = list(upload_dir.glob(f"{img_id}.*"))
+            if matches:
+                image_paths.append(matches[0])
+
     try:
         summary_response = await mistral_client.generate_summary(
             text=request.text,
@@ -578,7 +588,8 @@ async def generate_summary(
             reporting_period=request.reporting_period,
             include_standards=request.include_standards,
             include_iep_goals=request.include_iep_goals,
-            include_behavioral=request.include_behavioral
+            include_behavioral=request.include_behavioral,
+            image_paths=image_paths if image_paths else None,
         )
 
         summary_response.completed_at = datetime.utcnow()

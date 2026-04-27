@@ -117,6 +117,7 @@ export interface GenerateSummaryRequest {
   school?: string;
   reporting_period?: string;
   custom_prompt?: string;
+  image_ids?: string[];
   include_standards?: boolean;
   include_iep_goals?: boolean;
   include_behavioral?: boolean;
@@ -236,6 +237,7 @@ export interface ReportRecord {
   summaryText: string;
   ocrTexts: { filename: string; text: string }[];
   imageFilenames: string[];
+  imageThumbnails?: string[]; // base64 data URLs of uploaded images
   modelUsed: string;
   processingTime: number;
 }

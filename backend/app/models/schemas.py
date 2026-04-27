@@ -56,6 +56,7 @@ class GenerateSummaryRequest(BaseModel):
     school: Optional[str] = None
     reporting_period: Optional[str] = None
     custom_prompt: Optional[str] = None
+    image_ids: Optional[List[str]] = None  # Image UUIDs for vision-augmented generation
 
     # Maryland-specific options
     include_standards: bool = True

@@ -75,6 +75,7 @@ import {
 import PrivacyConsentModal from '../components/PrivacyConsentModal';
 import PrivacyBanner from '../components/PrivacyBanner';
 import { logEvent } from '../utils/auditLog';
+import { createThumbnails } from '../utils/thumbnails';
 
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const TIMEOUT_CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
@@ -298,6 +299,9 @@ function ReportPage() {
         case_manager: formData.case_manager || undefined,
         school: formData.school || undefined,
         reporting_period: formData.reporting_period,
+        image_ids: formData.report_type === 'iep_progress_monitoring'
+          ? images.map((img) => img.image_id)
+          : undefined,
         include_standards: formData.include_standards,
         include_iep_goals: formData.include_iep_goals,
         include_behavioral: formData.include_behavioral,
@@ -307,6 +311,12 @@ function ReportPage() {
       setSummaryText(stripCodeFences(result.summary_text));
       setGenerationStatus('');
 
+      // Generate thumbnails from uploaded images for report history
+      const previewUrls = images
+        .map((img) => img.preview_url)
+        .filter((url): url is string => !!url);
+      const thumbnails = await createThumbnails(previewUrls);
+
       const reportId = `report_${Date.now()}`;
       addReportToHistory({
         id: reportId,
@@ -315,6 +325,7 @@ function ReportPage() {
         summaryText: stripCodeFences(result.summary_text),
         ocrTexts: ocrPreviews,
         imageFilenames: images.map((img) => img.filename),
+        imageThumbnails: thumbnails,
         modelUsed: result.model_used,
         processingTime: result.processing_time,
       });
@@ -799,6 +810,31 @@ function ReportPage() {
                 </Button>
               </Flex>
 
+              {/* Original uploaded images */}
+              {images.length > 0 && (
+                <Box mb={4}>
+                  <Text fontSize="xs" fontWeight={600} color="gray.500" mb={2}>
+                    Original Student Work
+                  </Text>
+                  <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2}>
+                    {images.map((img) => (
+                      <Box
+                        key={img.image_id}
+                        borderRadius="md"
+                        overflow="hidden"
+                        border="1px solid"
+                        borderColor="gray.200"
+                      >
+                        {img.preview_url && (
+                          <Image src={img.preview_url} alt={img.filename} w="100%" objectFit="contain" maxH="160px" bg="gray.50" />
+                        )}
+                        <Text fontSize="2xs" color="gray.400" px={2} py={1} noOfLines={1}>{img.filename}</Text>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              )}
+
               <Box
                 className="report-output"
                 p={5}
@@ -955,6 +991,31 @@ function ReportPage() {
                     Download Word Doc
                   </Button>
                 </Flex>
+                {/* Saved image thumbnails */}
+                {viewingReport.imageThumbnails && viewingReport.imageThumbnails.length > 0 && (
+                  <Box mb={4}>
+                    <Text fontSize="xs" fontWeight={600} color="gray.500" mb={2}>
+                      Original Student Work
+                    </Text>
+                    <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2}>
+                      {viewingReport.imageThumbnails.map((thumb, idx) => (
+                        <Box
+                          key={idx}
+                          borderRadius="md"
+                          overflow="hidden"
+                          border="1px solid"
+                          borderColor="gray.200"
+                        >
+                          <Image src={thumb} alt={viewingReport.imageFilenames[idx] || `Page ${idx + 1}`} w="100%" objectFit="contain" maxH="160px" bg="gray.50" />
+                          <Text fontSize="2xs" color="gray.400" px={2} py={1} noOfLines={1}>
+                            {viewingReport.imageFilenames[idx] || `Page ${idx + 1}`}
+                          </Text>
+                        </Box>
+                      ))}
+                    </SimpleGrid>
+                  </Box>
+                )}
+
                 <Box className="report-output" p={5} borderRadius="md" border="1px solid" borderColor="gray.200" bg="white" fontSize="sm" sx={markdownStyles}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{stripCodeFences(viewingReport.summaryText)}</ReactMarkdown>
                 </Box>

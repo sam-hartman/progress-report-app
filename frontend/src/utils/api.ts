@@ -1,8 +1,8 @@
 // API client for the backend service
-import { 
-  ImageType, 
-  OCRResult, 
-  ExtractTablesResponse, 
+import {
+  ImageType,
+  OCRResult,
+  ExtractTablesResponse,
   GenerateSummaryResponse,
   SessionType,
   SessionDetailType,
@@ -117,10 +117,10 @@ export const SummaryAPI = {
     request: GenerateSummaryRequest,
     sessionId?: string
   ): Promise<GenerateSummaryResponse> => {
-    const url = sessionId 
+    const url = sessionId
       ? `${API_BASE}/generate-summary?session_id=${sessionId}`
       : `${API_BASE}/generate-summary`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

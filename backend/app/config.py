@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 from typing import Optional
 import os
+import secrets
 
 
 class Settings(BaseSettings):
@@ -46,6 +47,13 @@ class Settings(BaseSettings):
     # Redis for session storage
     redis_url: Optional[str] = Field(default=None, env="REDIS_URL")
     session_timeout: int = Field(default=3600, env="SESSION_TIMEOUT")  # 1 hour
+
+    # Session security
+    session_secret: str = Field(
+        default_factory=lambda: secrets.token_hex(32),
+        env="SESSION_SECRET"
+    )
+    session_expiry_hours: int = Field(default=2, env="SESSION_EXPIRY_HOURS")
     
     # Tesseract OCR (fallback)
     tesseract_path: Optional[str] = Field(default=None, env="TESSERACT_PATH")

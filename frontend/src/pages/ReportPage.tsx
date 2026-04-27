@@ -1,5 +1,5 @@
 // Single-page report generator
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   Box,
@@ -27,6 +27,13 @@ import {
   IconButton,
   Spinner,
   Badge,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  useDisclosure,
 } from '@chakra-ui/react';
 import {
   FiUpload,
@@ -43,6 +50,7 @@ import {
   FiTrash2,
   FiArrowLeft,
   FiInfo,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -63,6 +71,12 @@ import {
   MARYLAND_SUBJECTS,
   REPORTING_PERIODS,
 } from '../types';
+import PrivacyConsentModal from '../components/PrivacyConsentModal';
+import PrivacyBanner from '../components/PrivacyBanner';
+import { logEvent } from '../utils/auditLog';
+
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const TIMEOUT_CHECK_INTERVAL_MS = 60 * 1000; // 60 seconds
 
 function ReportPage() {
   const toast = useToast();
@@ -82,7 +96,15 @@ function ReportPage() {
   const { sessionId } = useSession();
   const { formData, updateFormData } = useFormData();
   const { addSummary } = useSummary();
-  const { reportHistory, addReportToHistory, removeReportFromHistory } = useReportHistory();
+  const { reportHistory, addReportToHistory, removeReportFromHistory, clearHistory } = useReportHistory();
+
+  // Clear All My Data dialog
+  const {
+    isOpen: isClearDialogOpen,
+    onOpen: onClearDialogOpen,
+    onClose: onClearDialogClose,
+  } = useDisclosure();
+  const clearDialogCancelRef = useRef<HTMLButtonElement>(null);
 
   const isFirstVisit = reportHistory.length === 0 && images.length === 0 && !summaryText;
 
@@ -107,6 +129,57 @@ function ReportPage() {
     }
   }, [sessionId, toast]);
 
+  // Session timeout: clear in-memory state after 30 minutes of inactivity
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const lastActivity = useAppStore.getState().lastActivityAt;
+      if (lastActivity && Date.now() - lastActivity > SESSION_TIMEOUT_MS) {
+        // Clear in-memory working data but keep history and consent
+        useAppStore.getState().resetAll();
+        setSummaryText('');
+        setOcrPreviewTexts([]);
+        setError(null);
+        setGenerationStatus('');
+        setViewingReport(null);
+        toast({
+          title: 'Session timed out for privacy. Your saved reports are still available.',
+          status: 'info',
+          duration: 6000,
+          isClosable: true,
+        });
+      }
+    }, TIMEOUT_CHECK_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [toast]);
+
+  // Track user activity
+  const handleUserActivity = useCallback(() => {
+    const updateActivity = useAppStore.getState().updateActivity;
+    if (typeof updateActivity === 'function') {
+      updateActivity();
+    }
+  }, []);
+
+  // Clear all data handler
+  const handleClearAllData = useCallback(() => {
+    useAppStore.getState().resetAll();
+    clearHistory();
+    localStorage.clear();
+    setSummaryText('');
+    setOcrPreviewTexts([]);
+    setError(null);
+    setGenerationStatus('');
+    setViewingReport(null);
+    logEvent('DATA_CLEARED');
+    onClearDialogClose();
+    toast({
+      title: 'All your data has been cleared.',
+      status: 'success',
+      duration: 4000,
+      isClosable: true,
+    });
+  }, [clearHistory, onClearDialogClose, toast]);
+
   // File drop handler
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
@@ -124,6 +197,7 @@ function ReportPage() {
       try {
         const image = await API.image.upload(file, sessionId || undefined);
         addImage({ ...image, preview_url: URL.createObjectURL(file), status: 'uploaded' as const });
+        logEvent('IMAGE_UPLOADED', image.image_id);
       } catch {
         toast({ title: `Failed to upload "${file.name}". Please try again.`, status: 'error', duration: 5000, isClosable: true });
       }
@@ -163,6 +237,7 @@ function ReportPage() {
             const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
             const image = await API.image.upload(file, sessionId || undefined);
             addImage({ ...image, preview_url: URL.createObjectURL(file), status: 'uploaded' as const });
+            logEvent('IMAGE_UPLOADED', image.image_id);
           }
           stream.getTracks().forEach(track => track.stop());
         }, 'image/jpeg', 0.9);
@@ -217,8 +292,9 @@ function ReportPage() {
       setSummaryText(result.summary_text);
       setGenerationStatus('');
 
+      const reportId = `report_${Date.now()}`;
       addReportToHistory({
-        id: `report_${Date.now()}`,
+        id: reportId,
         createdAt: new Date().toISOString(),
         formData: { ...formData },
         summaryText: result.summary_text,
@@ -227,6 +303,7 @@ function ReportPage() {
         modelUsed: result.model_used,
         processingTime: result.processing_time,
       });
+      logEvent('REPORT_GENERATED', reportId);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setError(message);
@@ -285,7 +362,9 @@ function ReportPage() {
   };
 
   return (
-    <Box maxW="960px" mx="auto" px={{ base: 4, md: 6 }} py={6}>
+    <Box maxW="960px" mx="auto" px={{ base: 4, md: 6 }} py={6} onClick={handleUserActivity}>
+      <PrivacyConsentModal />
+      <PrivacyBanner />
       <VStack spacing={5} align="stretch">
 
         {!viewingReport && (<>
@@ -856,7 +935,7 @@ function ReportPage() {
                         variant="ghost"
                         color="gray.400"
                         _hover={{ color: 'red.500' }}
-                        onClick={(e) => { e.stopPropagation(); removeReportFromHistory(report.id); }}
+                        onClick={(e) => { e.stopPropagation(); removeReportFromHistory(report.id); logEvent('REPORT_DELETED', report.id); }}
                       />
                     </Flex>
                   ))}
@@ -865,6 +944,62 @@ function ReportPage() {
             </CardBody>
           </Card>
         )}
+
+        {/* Clear All My Data */}
+        {!viewingReport && (
+          <Flex justify="center" pt={2} pb={2}>
+            <Button
+              leftIcon={<FiAlertTriangle />}
+              size="xs"
+              variant="outline"
+              colorScheme="red"
+              onClick={onClearDialogOpen}
+            >
+              Clear All My Data
+            </Button>
+          </Flex>
+        )}
+
+        {/* Clear Data Confirmation Dialog */}
+        <AlertDialog
+          isOpen={isClearDialogOpen}
+          leastDestructiveRef={clearDialogCancelRef}
+          onClose={onClearDialogClose}
+          isCentered
+        >
+          <AlertDialogOverlay>
+            <AlertDialogContent mx={4}>
+              <AlertDialogHeader fontSize="md" fontWeight={700} color="gray.800">
+                Clear All Data
+              </AlertDialogHeader>
+
+              <AlertDialogBody>
+                <Text fontSize="sm" color="gray.600" lineHeight={1.7}>
+                  This will permanently delete all your data, including saved reports,
+                  uploaded images, and form entries. This cannot be undone.
+                </Text>
+              </AlertDialogBody>
+
+              <AlertDialogFooter gap={2}>
+                <Button
+                  ref={clearDialogCancelRef}
+                  onClick={onClearDialogClose}
+                  size="sm"
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  colorScheme="red"
+                  onClick={handleClearAllData}
+                  size="sm"
+                >
+                  Delete Everything
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialogOverlay>
+        </AlertDialog>
 
         <style>{`
           @media print {

@@ -178,6 +178,12 @@ export interface AppState {
   // Report history
   reportHistory: ReportRecord[];
 
+  // Privacy & compliance
+  privacyConsent: PrivacyConsent | null;
+
+  // Session timeout
+  lastActivityAt: number;
+
   // UI state
   currentStep: 'upload' | 'ocr' | 'tables' | 'summary';
   is_mobile: boolean;
@@ -213,6 +219,8 @@ export interface AppState {
   addReportToHistory: (report: ReportRecord) => void;
   removeReportFromHistory: (reportId: string) => void;
   clearHistory: () => void;
+  setPrivacyConsent: (consent: PrivacyConsent | null) => void;
+  updateActivity: () => void;
   resetAll: () => void;
 }
 
@@ -226,6 +234,18 @@ export interface ReportRecord {
   imageFilenames: string[];
   modelUsed: string;
   processingTime: number;
+}
+
+// Privacy & Compliance types
+export interface PrivacyConsent {
+  consentedAt: string;
+  version: string;  // e.g. "1.0"
+}
+
+export interface AuditLogEntry {
+  timestamp: string;
+  event: string;  // e.g. 'CONSENT_GIVEN', 'IMAGE_UPLOADED', 'REPORT_GENERATED', 'DATA_CLEARED'
+  details?: string;  // No PII - just IDs
 }
 
 // Maryland-specific types

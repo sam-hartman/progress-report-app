@@ -15,6 +15,15 @@ from ..models.schemas import OCRResultResponse, GenerateSummaryResponse, Structu
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_log_message(message: str, pii_fields: list[str]) -> str:
+    """Strip known PII values from a log message before writing."""
+    sanitized = message
+    for field in pii_fields:
+        if field and field in sanitized:
+            sanitized = sanitized.replace(field, "[REDACTED]")
+    return sanitized
+
+
 class MistralClient:
     """Client for Mistral AI API"""
     
@@ -24,6 +33,8 @@ class MistralClient:
         self.ocr_model = settings.mistral_ocr_model
         self.llm_model = settings.mistral_llm_model
         self._client = httpx.AsyncClient(timeout=120.0)
+        # Tracks PII values for the current request so log messages can be sanitized
+        self._pii_fields: list[str] = []
         
     async def __aenter__(self):
         return self
@@ -79,10 +90,16 @@ class MistralClient:
             return result
             
         except httpx.HTTPStatusError as e:
-            logger.error(f"Mistral API error: {e.response.status_code} - {e.response.text}")
+            sanitized_body = _sanitize_log_message(
+                e.response.text, self._pii_fields
+            )
+            logger.error(
+                f"Mistral API error: {e.response.status_code} - {sanitized_body}"
+            )
             raise
         except Exception as e:
-            logger.error(f"Mistral API request failed: {str(e)}")
+            sanitized_msg = _sanitize_log_message(str(e), self._pii_fields)
+            logger.error(f"Mistral API request failed: {sanitized_msg}")
             raise
     
     async def perform_ocr(
@@ -132,7 +149,8 @@ class MistralClient:
             )
 
         except Exception as e:
-            logger.error(f"Mistral OCR failed: {str(e)}")
+            sanitized_msg = _sanitize_log_message(str(e), self._pii_fields)
+            logger.error(f"Mistral OCR failed: {sanitized_msg}")
             raise
     
     async def extract_tables(
@@ -193,7 +211,8 @@ Text to analyze:
                 return {"tables": []}
                 
         except Exception as e:
-            logger.error(f"Table extraction failed: {str(e)}")
+            sanitized_msg = _sanitize_log_message(str(e), self._pii_fields)
+            logger.error(f"Table extraction failed: {sanitized_msg}")
             return {"tables": []}
     
     async def generate_summary(
@@ -211,12 +230,19 @@ Text to analyze:
         include_behavioral: bool = True
     ) -> GenerateSummaryResponse:
         """
-        Generate a structured summary from extracted text
+        Generate a structured summary from extracted text.
+
+        Real names are sent to Mistral (protected by ZDR at the API level).
         """
         import time as time_module
         start_time = time_module.time()
-        
-        # Build the prompt based on template
+
+        # Track PII for log sanitization
+        self._pii_fields = [
+            v for v in [student_name, teacher_name, school] if v
+        ]
+
+        # Send real names to the LLM — ZDR protects PII at the API level
         prompt = self._build_summary_prompt(
             text=text,
             template=template,
@@ -230,7 +256,7 @@ Text to analyze:
             include_iep_goals=include_iep_goals,
             include_behavioral=include_behavioral
         )
-        
+
         payload = {
             "model": self.llm_model,
             "messages": [
@@ -242,25 +268,26 @@ Text to analyze:
             "max_tokens": 4096,
             "temperature": 0.3
         }
-        
+
         try:
             result = await self._make_request("POST", "chat/completions", payload)
             summary_text = result["choices"][0]["message"]["content"]
-            
+
             # Parse structured data from the response
             structured_data = self._parse_summary_response(summary_text)
-            
+
             processing_time = time_module.time() - start_time
-            
+
             return GenerateSummaryResponse(
                 summary_text=summary_text,
                 structured_data=structured_data,
                 processing_time=processing_time,
                 model_used=self.llm_model
             )
-            
+
         except Exception as e:
-            logger.error(f"Summary generation failed: {str(e)}")
+            sanitized_msg = _sanitize_log_message(str(e), self._pii_fields)
+            logger.error(f"Summary generation failed: {sanitized_msg}")
             raise
     
     def _build_summary_prompt(

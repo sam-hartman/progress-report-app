@@ -1,7 +1,8 @@
 // Zustand store for application state
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, ReportRecord, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
+import { createJSONStorage, devtools, persist } from 'zustand/middleware';
+import { AppState, ImageType, OCRResult, SessionType, TableData, GenerateSummaryResponse, ReportRecord, PrivacyConsent, MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS } from '../types';
+import { encryptedStorage } from '../utils/encryptedStorage';
 
 export { MARYLAND_GRADES, MARYLAND_SUBJECTS, REPORTING_PERIODS };
 
@@ -13,8 +14,19 @@ type AppData = Omit<AppState,
   'addSummary' | 'setCurrentSummaryId' | 'setSummaryState' | 'resetSummary' |
   'updateFormData' | 'setCurrentStep' | 'goToUpload' | 'goToOCR' | 'goToTables' |
   'goToSummary' | 'setIsMobile' | 'setHasCameraAccess' | 'addReportToHistory' |
-  'removeReportFromHistory' | 'clearHistory' | 'resetAll'
+  'removeReportFromHistory' | 'clearHistory' | 'setPrivacyConsent' | 'updateActivity' |
+  'resetAll'
 >;
+
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+
+function purgeOldReports(reports: ReportRecord[]): ReportRecord[] {
+  const cutoff = Date.now() - NINETY_DAYS_MS;
+  return reports.filter((report) => {
+    const createdMs = new Date(report.createdAt).getTime();
+    return createdMs >= cutoff;
+  });
+}
 
 const initialState: AppData = {
   // Session
@@ -65,6 +77,12 @@ const initialState: AppData = {
   
   // Report history
   reportHistory: [],
+
+  // Privacy & compliance
+  privacyConsent: null,
+
+  // Session timeout
+  lastActivityAt: Date.now(),
 
   // UI state
   currentStep: 'upload',
@@ -174,7 +192,16 @@ export const useAppStore = create<AppState>()(
 
         clearHistory: () => set({ reportHistory: [] }),
 
-        resetAll: () => set({ ...initialState, reportHistory: _get().reportHistory }),
+        setPrivacyConsent: (consent: PrivacyConsent | null) => set({ privacyConsent: consent }),
+
+        updateActivity: () => set({ lastActivityAt: Date.now() }),
+
+        resetAll: () => set({
+          ...initialState,
+          reportHistory: _get().reportHistory,
+          privacyConsent: _get().privacyConsent,
+          lastActivityAt: Date.now(),
+        }),
         
         // Navigation helpers
         goToUpload: () => set({ currentStep: 'upload' }),
@@ -184,11 +211,23 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: 'qpr-app-storage',
+        storage: createJSONStorage(() => encryptedStorage),
         partialize: (state) => ({
           formData: state.formData,
           currentStep: state.currentStep,
           reportHistory: state.reportHistory,
+          privacyConsent: state.privacyConsent,
         }),
+        onRehydrateStorage: () => {
+          return (state) => {
+            if (state && state.reportHistory && state.reportHistory.length > 0) {
+              const purged = purgeOldReports(state.reportHistory);
+              if (purged.length !== state.reportHistory.length) {
+                state.reportHistory = purged;
+              }
+            }
+          };
+        },
       }
     ),
     { name: 'AppStore' }

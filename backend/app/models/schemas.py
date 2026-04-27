@@ -151,12 +151,13 @@ class GenerateSummaryResponse(BaseModel):
 class SessionResponse(BaseModel):
     """Response schema for session data"""
     session_id: UUID
+    session_token: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     image_count: int = 0
     ocr_count: int = 0
     summary_count: int = 0
-    
+
     class Config:
         from_attributes = True
 

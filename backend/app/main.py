@@ -1,18 +1,22 @@
 """
 FastAPI application for Quarterly Progress Report Notes
 """
-from fastapi import FastAPI, HTTPException, UploadFile, File, Depends, status
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from uuid import UUID, uuid4
+import hashlib
+import hmac
 import logging
 import os
 import shutil
+
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import settings
 from .models.schemas import (
@@ -37,6 +41,98 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+# --- PII Sanitization Helper (Layer 5) ---
+
+def sanitize_log_message(message: str, pii_fields: list[str]) -> str:
+    """Strip known PII values from a log message before writing."""
+    sanitized = message
+    for field in pii_fields:
+        if field and field in sanitized:
+            sanitized = sanitized.replace(field, "[REDACTED]")
+    return sanitized
+
+
+# --- Security Headers Middleware (Layer 7) ---
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self' https://api.mistral.ai"
+        )
+        response.headers["Referrer-Policy"] = "no-referrer"
+
+        # Cache-Control: no-store on /api/ routes
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+
+        return response
+
+
+# --- HMAC Session Token Helpers (Layer 6) ---
+
+def _generate_session_token(session_id: str) -> str:
+    """Generate an HMAC-based session token for the given session_id."""
+    return hmac.new(
+        settings.session_secret.encode(),
+        session_id.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _validate_session_token(session_id: str, token: str) -> bool:
+    """Validate an HMAC session token against the session_id."""
+    expected = _generate_session_token(session_id)
+    return hmac.compare_digest(expected, token)
+
+
+def _resolve_session(request: Request, session_id_param: Optional[str] = None) -> Optional[str]:
+    """Resolve session_id from headers (preferred) or query params (backward compat).
+
+    Returns the validated session_id or None.
+    Raises HTTPException if a token is provided but invalid, or if the session
+    has expired.
+    """
+    # Prefer header-based session
+    header_session_id = request.headers.get("X-Session-ID")
+    header_session_token = request.headers.get("X-Session-Token")
+
+    sid = header_session_id or session_id_param
+    if not sid:
+        return None
+
+    # If a token was provided (header path), validate it
+    if header_session_token:
+        if not _validate_session_token(sid, header_session_token):
+            raise HTTPException(status_code=403, detail="Invalid session token")
+
+    # Check session exists and is not expired
+    session = session_store.get_session(sid)
+    if session is None:
+        return None
+
+    created_at: datetime = session["created_at"]
+    expiry = timedelta(hours=settings.session_expiry_hours)
+    if datetime.utcnow() - created_at > expiry:
+        raise HTTPException(status_code=401, detail="Session has expired")
+
+    return sid
+
 
 # Lifespan management
 @asynccontextmanager
@@ -89,6 +185,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Security headers middleware (Layer 7) — registered first so it wraps all responses
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -96,6 +195,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Session-ID", "X-Session-Token"],
 )
 
 # Mount static files
@@ -176,8 +276,7 @@ async def general_exception_handler(request, exc):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=ErrorResponse(
-            error="Internal server error",
-            detail=str(exc)
+            error="An unexpected error occurred. Please try again.",
         ).model_dump()
     )
 
@@ -201,11 +300,13 @@ async def health_check():
 # Session endpoints
 @app.post("/api/sessions", response_model=SessionResponse)
 async def create_session():
-    """Create a new user session"""
+    """Create a new user session with HMAC token"""
     session_id = session_store.create_session()
     session = session_store.get_session(session_id)
+    session_token = _generate_session_token(session_id)
     return SessionResponse(
         session_id=UUID(session_id),
+        session_token=session_token,
         created_at=session["created_at"],
         updated_at=session["updated_at"]
     )
@@ -228,17 +329,27 @@ async def list_sessions():
 
 
 @app.get("/api/sessions/{session_id}", response_model=SessionDetailResponse)
-async def get_session(session_id: str):
+async def get_session(request: Request, session_id: str):
     """Get session details with all data"""
+    # Validate session token if provided via header
+    header_token = request.headers.get("X-Session-Token")
+    if header_token and not _validate_session_token(session_id, header_token):
+        raise HTTPException(status_code=403, detail="Invalid session token")
+
     session = session_store.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
+    # Check expiry
+    expiry = timedelta(hours=settings.session_expiry_hours)
+    if datetime.utcnow() - session["created_at"] > expiry:
+        raise HTTPException(status_code=401, detail="Session has expired")
+
     # Get all data for this session
     images = session_store.images.get(session_id, [])
     ocr_results = session_store.ocr_results.get(session_id, [])
     summaries = session_store.summaries.get(session_id, [])
-    
+
     return SessionDetailResponse(
         session_id=UUID(session_id),
         created_at=session["created_at"],
@@ -255,17 +366,21 @@ async def get_session(session_id: str):
 # Image upload endpoint
 @app.post("/api/upload", response_model=ImageResponse)
 async def upload_image(
+    request: Request,
     file: UploadFile = File(...),
     session_id: Optional[str] = None
 ):
     """Upload an image for OCR processing"""
+    # Resolve session from headers or query param
+    resolved_session = _resolve_session(request, session_id)
+
     # Validate file type
     if file.content_type not in settings.allowed_image_types:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid file type. Allowed: {', '.join(settings.allowed_image_types)}"
         )
-    
+
     # Validate file size
     file_size_mb = len(await file.read()) / (1024 * 1024)
     if file_size_mb > settings.max_image_size_mb:
@@ -273,23 +388,23 @@ async def upload_image(
             status_code=400,
             detail=f"File too large. Max: {settings.max_image_size_mb}MB"
         )
-    
+
     # Reset file pointer
     await file.seek(0)
-    
+
     # Generate unique filename
     image_id = uuid4()
     file_ext = Path(file.filename).suffix
     filename = f"{image_id}{file_ext}"
     save_path = Path(settings.upload_dir) / filename
-    
+
     # Save file
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
+
     # Get image info
     width, height, format = ImageProcessor.get_image_info(save_path)
-    
+
     # Create response
     image_response = ImageResponse(
         image_id=image_id,
@@ -300,11 +415,11 @@ async def upload_image(
         width=width,
         height=height
     )
-    
+
     # Store in session if provided
-    if session_id:
-        session_store.store_image(session_id, image_response.model_dump())
-    
+    if resolved_session:
+        session_store.store_image(resolved_session, image_response.model_dump())
+
     return image_response
 
 
@@ -312,10 +427,14 @@ async def upload_image(
 @app.post("/api/ocr", response_model=OCRResultResponse)
 async def perform_ocr(
     request: OCRRequest,
+    http_request: Request,
     session_id: Optional[str] = None,
     mistral_client: MistralClient = Depends(get_mistral_client)
 ):
     """Perform OCR on an uploaded image"""
+    # Resolve session from headers or query param
+    resolved_session = _resolve_session(http_request, session_id)
+
     # Find the image
     image_path = Path(settings.upload_dir) / f"{request.image_id}.jpg"
     if not image_path.exists():
@@ -324,16 +443,16 @@ async def perform_ocr(
         image_path = Path(settings.upload_dir) / f"{request.image_id}.jpeg"
     if not image_path.exists():
         image_path = Path(settings.upload_dir) / f"{request.image_id}.webp"
-    
+
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Image not found")
-    
+
     # Preprocess image if requested
     if request.enhance_image:
         processed_path = ImageProcessor.preprocess_for_ocr(image_path)
     else:
         processed_path = image_path
-    
+
     try:
         # Use Mistral OCR if available and requested
         if request.use_mistral and settings.mistral_api_key:
@@ -349,22 +468,22 @@ async def perform_ocr(
                 language=request.language
             )
             model_used = "tesseract"
-        
+
         # Set image_id in result
         ocr_result.image_id = request.image_id
         ocr_result.model_used = model_used
         ocr_result.completed_at = datetime.utcnow()
-        
+
         # Store in session if provided
-        if session_id:
-            session_store.store_ocr_result(session_id, ocr_result.model_dump())
-        
+        if resolved_session:
+            session_store.store_ocr_result(resolved_session, ocr_result.model_dump())
+
         # Clean up processed file if different from original
         if processed_path != image_path:
             processed_path.unlink()
-        
+
         return ocr_result
-        
+
     except Exception as e:
         # Clean up processed file if different from original
         if processed_path != image_path and processed_path.exists():
@@ -379,18 +498,22 @@ async def perform_ocr(
 @app.post("/api/extract-tables", response_model=ExtractTablesResponse)
 async def extract_tables(
     request: ExtractTablesRequest,
+    http_request: Request,
     session_id: Optional[str] = None,
     mistral_client: MistralClient = Depends(get_mistral_client)
 ):
     """Extract tables from OCR text"""
-    import hashlib
+    import hashlib as _hashlib
     import time as time_module
-    
+
+    # Resolve session from headers or query param
+    resolved_session = _resolve_session(http_request, session_id)
+
     start_time = time_module.time()
-    
+
     # Generate text hash for caching
-    text_hash = hashlib.md5(request.text.encode()).hexdigest()
-    
+    text_hash = _hashlib.md5(request.text.encode()).hexdigest()
+
     try:
         # Use Mistral for table extraction
         if settings.mistral_api_key:
@@ -398,30 +521,30 @@ async def extract_tables(
         else:
             # Fallback to simple table detection
             result = ImageProcessor._simple_table_extraction(request.text)
-        
+
         tables = result.get("tables", [])
-        
+
         # Filter by confidence if specified
         if request.min_confidence < 1.0:
             tables = [
-                t for t in tables 
+                t for t in tables
                 if t.get("confidence", 1.0) >= request.min_confidence
             ]
-        
+
         processing_time = time_module.time() - start_time
-        
+
         response = ExtractTablesResponse(
             text_hash=text_hash,
             tables=tables,
             processing_time=processing_time
         )
-        
+
         # Store in session if provided
-        if session_id:
-            session_store.store_ocr_result(session_id, response.model_dump())
-        
+        if resolved_session:
+            session_store.store_ocr_result(resolved_session, response.model_dump())
+
         return response
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -433,10 +556,14 @@ async def extract_tables(
 @app.post("/api/generate-summary", response_model=GenerateSummaryResponse)
 async def generate_summary(
     request: GenerateSummaryRequest,
+    http_request: Request,
     session_id: Optional[str] = None,
     mistral_client: MistralClient = Depends(get_mistral_client)
 ):
     """Generate a structured summary from OCR text"""
+    # Resolve session from headers or query param
+    resolved_session = _resolve_session(http_request, session_id)
+
     try:
         summary_response = await mistral_client.generate_summary(
             text=request.text,
@@ -451,15 +578,15 @@ async def generate_summary(
             include_iep_goals=request.include_iep_goals,
             include_behavioral=request.include_behavioral
         )
-        
+
         summary_response.completed_at = datetime.utcnow()
-        
+
         # Store in session if provided
-        if session_id:
-            session_store.store_summary(session_id, summary_response.model_dump())
-        
+        if resolved_session:
+            session_store.store_summary(resolved_session, summary_response.model_dump())
+
         return summary_response
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,

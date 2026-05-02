@@ -302,9 +302,6 @@ function ReportPage() {
         native_language: formData.report_type === 'iep_progress_monitoring'
           ? formData.native_language || 'English'
           : undefined,
-        image_ids: formData.report_type === 'iep_progress_monitoring'
-          ? images.map((img) => img.image_id)
-          : undefined,
         include_standards: formData.include_standards,
         include_iep_goals: formData.include_iep_goals,
         include_behavioral: formData.include_behavioral,

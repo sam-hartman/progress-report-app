@@ -231,10 +231,9 @@ Text to analyze:
         include_standards: bool = True,
         include_iep_goals: bool = False,
         include_behavioral: bool = True,
-        image_paths: Optional[List[Path]] = None,
     ) -> GenerateSummaryResponse:
         """
-        Generate a structured summary from extracted text.
+        Generate a structured summary from OCR-extracted text.
 
         Real names are sent to Mistral (protected by ZDR at the API level).
         """
@@ -257,7 +256,6 @@ Text to analyze:
                 school=school,
                 reporting_period=reporting_period,
                 include_behavioral=include_behavioral,
-                has_images=bool(image_paths),
                 native_language=native_language,
             )
         else:
@@ -275,28 +273,9 @@ Text to analyze:
                 include_behavioral=include_behavioral,
             )
 
-        # Build message content — multimodal if images provided
-        if image_paths:
-            content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}]
-            for img_path in image_paths:
-                try:
-                    with open(img_path, "rb") as f:
-                        img_b64 = base64.b64encode(f.read()).decode("utf-8")
-                    suffix = img_path.suffix.lower().lstrip(".")
-                    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(suffix, "image/jpeg")
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{mime};base64,{img_b64}"},
-                    })
-                except Exception:
-                    pass  # Skip unreadable images
-            messages = [{"role": "user", "content": content}]
-        else:
-            messages = [{"role": "user", "content": prompt}]
-
         payload = {
             "model": self.llm_model,
-            "messages": messages,
+            "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 8192,
             "temperature": 0.3
         }
@@ -454,7 +433,6 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
         school: Optional[str],
         reporting_period: Optional[str],
         include_behavioral: bool,
-        has_images: bool = False,
         native_language: Optional[str] = None,
     ) -> str:
         """Build the IEP Progress Monitoring prompt matching Maryland State IEP format."""
@@ -467,13 +445,6 @@ Maryland College and Career Ready Standards (MCCRS) alignment:
             "You generate ONLY the 'Description of Progress' field for the Maryland State IEP form (Section IV. Goals).",
             "",
         ]
-
-        if has_images:
-            prompt_parts.extend([
-                "You have been provided with BOTH the original photos of the data collection sheets AND OCR-extracted text.",
-                "Use the original images as your primary source of truth. The OCR text may contain errors with handwritten numbers, checkmarks, and abbreviations.",
-                "",
-            ])
 
         # Student info
         prompt_parts.append("Student Information:")

@@ -118,7 +118,6 @@ export interface GenerateSummaryRequest {
   reporting_period?: string;
   native_language?: string;
   custom_prompt?: string;
-  image_ids?: string[];
   include_standards?: boolean;
   include_iep_goals?: boolean;
   include_behavioral?: boolean;

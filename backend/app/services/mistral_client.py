@@ -286,7 +286,7 @@ Text to analyze:
                     mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(suffix, "image/jpeg")
                     content.append({
                         "type": "image_url",
-                        "image_url": f"data:{mime};base64,{img_b64}",
+                        "image_url": {"url": f"data:{mime};base64,{img_b64}"},
                     })
                 except Exception:
                     pass  # Skip unreadable images

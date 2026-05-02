@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     
     # Image Processing
     max_image_size_mb: int = Field(default=10, env="MAX_IMAGE_SIZE_MB")
-    allowed_image_types: list[str] = ["image/jpeg", "image/png", "image/webp"]
+    allowed_image_types: list[str] = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
     
     # Storage
     upload_dir: str = Field(default="./uploads", env="UPLOAD_DIR")

@@ -117,18 +117,24 @@ class MistralClient:
 
         image_b64 = base64.b64encode(image_data).decode("utf-8")
 
-        # Detect mime type from extension
-        suffix = image_path.suffix.lower()
-        mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
-            suffix.lstrip("."), "image/png"
-        )
+        suffix = image_path.suffix.lower().lstrip(".")
+        if suffix == "pdf":
+            document = {
+                "type": "document_url",
+                "document_url": f"data:application/pdf;base64,{image_b64}",
+            }
+        else:
+            mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"}.get(
+                suffix, "image/png"
+            )
+            document = {
+                "type": "image_url",
+                "image_url": f"data:{mime};base64,{image_b64}",
+            }
 
         payload = {
             "model": self.ocr_model,
-            "document": {
-                "type": "image_url",
-                "image_url": f"data:{mime};base64,{image_b64}"
-            }
+            "document": document,
         }
 
         try:

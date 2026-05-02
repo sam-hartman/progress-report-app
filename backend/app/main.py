@@ -402,8 +402,11 @@ async def upload_image(
     with open(save_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Get image info
-    width, height, format = ImageProcessor.get_image_info(save_path)
+    # Get image info (PDFs have no pixel dimensions)
+    if file.content_type == "application/pdf":
+        width, height = None, None
+    else:
+        width, height, _fmt = ImageProcessor.get_image_info(save_path)
 
     # Create response
     image_response = ImageResponse(
@@ -435,20 +438,20 @@ async def perform_ocr(
     # Resolve session from headers or query param
     resolved_session = _resolve_session(http_request, session_id)
 
-    # Find the image
-    image_path = Path(settings.upload_dir) / f"{request.image_id}.jpg"
-    if not image_path.exists():
-        image_path = Path(settings.upload_dir) / f"{request.image_id}.png"
-    if not image_path.exists():
-        image_path = Path(settings.upload_dir) / f"{request.image_id}.jpeg"
-    if not image_path.exists():
-        image_path = Path(settings.upload_dir) / f"{request.image_id}.webp"
+    # Find the uploaded file
+    image_path = None
+    for ext in ("jpg", "jpeg", "png", "webp", "pdf"):
+        candidate = Path(settings.upload_dir) / f"{request.image_id}.{ext}"
+        if candidate.exists():
+            image_path = candidate
+            break
 
-    if not image_path.exists():
+    if image_path is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    # Preprocess image if requested
-    if request.enhance_image:
+    # Preprocess image if requested (PDFs are passed directly to Mistral OCR)
+    is_pdf = image_path.suffix.lower() == ".pdf"
+    if request.enhance_image and not is_pdf:
         processed_path = ImageProcessor.preprocess_for_ocr(image_path)
     else:
         processed_path = image_path

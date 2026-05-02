@@ -51,6 +51,7 @@ import {
   FiArrowLeft,
   FiInfo,
   FiAlertTriangle,
+  FiFileText,
 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -196,8 +197,8 @@ function ReportPage() {
     setUploadState({ is_uploading: true, upload_progress: 0, error: null });
 
     for (const file of acceptedFiles) {
-      if (!file.type.startsWith('image/')) {
-        toast({ title: `"${file.name}" is not an image. Please use JPG, PNG, or WebP files.`, status: 'error', duration: 5000, isClosable: true });
+      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+        toast({ title: `"${file.name}" is not a supported file. Please use JPG, PNG, WebP, or PDF.`, status: 'error', duration: 5000, isClosable: true });
         continue;
       }
       if (file.size > 10 * 1024 * 1024) {
@@ -217,7 +218,12 @@ function ReportPage() {
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: { 'image/jpeg': ['.jpeg', '.jpg'], 'image/png': ['.png'], 'image/webp': ['.webp'] },
+    accept: {
+      'image/jpeg': ['.jpeg', '.jpg'],
+      'image/png': ['.png'],
+      'image/webp': ['.webp'],
+      'application/pdf': ['.pdf'],
+    },
     multiple: true,
     noClick: true,
   });
@@ -466,7 +472,7 @@ function ReportPage() {
                 Browse Files
               </Button>
               <Text fontSize="xs" color="gray.400" mt={2}>
-                Accepts JPG, PNG, and WebP images up to 10MB each
+                Accepts JPG, PNG, WebP, and PDF files up to 10MB each
               </Text>
             </Box>
 
@@ -497,9 +503,13 @@ function ReportPage() {
                       borderColor="gray.200"
                       bg="white"
                     >
-                      {image.preview_url && (
+                      {image.content_type === 'application/pdf' ? (
+                        <Flex h="80px" w="100%" align="center" justify="center" bg="red.50">
+                          <Icon as={FiFileText} boxSize={8} color="red.400" />
+                        </Flex>
+                      ) : image.preview_url ? (
                         <Image src={image.preview_url} alt={image.filename} h="80px" w="100%" objectFit="cover" />
-                      )}
+                      ) : null}
                       <Flex align="center" justify="space-between" px={2} py={1}>
                         <Text fontSize="2xs" color="gray.500" noOfLines={1} flex={1}>{image.filename}</Text>
                         <IconButton
@@ -834,9 +844,13 @@ function ReportPage() {
                         border="1px solid"
                         borderColor="gray.200"
                       >
-                        {img.preview_url && (
+                        {img.content_type === 'application/pdf' ? (
+                          <Flex h="160px" w="100%" align="center" justify="center" bg="red.50">
+                            <Icon as={FiFileText} boxSize={10} color="red.400" />
+                          </Flex>
+                        ) : img.preview_url ? (
                           <Image src={img.preview_url} alt={img.filename} w="100%" objectFit="contain" maxH="160px" bg="gray.50" />
-                        )}
+                        ) : null}
                         <Text fontSize="2xs" color="gray.400" px={2} py={1} noOfLines={1}>{img.filename}</Text>
                       </Box>
                     ))}
